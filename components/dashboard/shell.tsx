@@ -9,14 +9,15 @@ import { Bell, BadgeHelp as Help } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 
 interface DashboardShellProps {
   children: React.ReactNode;
   fullWidth?: boolean;
   groups: Group[];
-  decks: (Deck & { groups: Group[] })[];
+  decks: DeckWithCardsAndGroups[];
   groupMode: boolean;
-  setDecks: React.Dispatch<React.SetStateAction<(Deck & { groups: Group[] })[]>>;
+  setDecks: React.Dispatch<React.SetStateAction<DeckWithCardsAndGroups[]>>;
   setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 

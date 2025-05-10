@@ -59,12 +59,14 @@ export function ManualCreateForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentCardId, setCurrentCardId] = useState('1');
   // Deckは複数の分野（グループ）に属せるので、groupId配列で管理
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([mockGroups[0].id]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetch('/api/groups')
       .then(res => res.json())
-      .then(data => setGroups(data))
+      .then(data => {
+        setGroups(data);
+      })
       .catch(e => console.error('グループ取得エラー:', e));
   }, []);
   
@@ -87,7 +89,6 @@ export function ManualCreateForm() {
   });
   
   const addNewCard = () => {
-    // Save current card first
     saveCurrentCard();
     
     const newId = Date.now().toString();
@@ -95,7 +96,6 @@ export function ManualCreateForm() {
     setCards([...cards, newCard]);
     setCurrentCardId(newId);
     
-    // Reset card form
     cardForm.reset({
       front: '',
       back: '',

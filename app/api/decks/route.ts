@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
   const { title, description, groupIds, cardCount, progress, lastStudied, cards } = data;
 
   try {
+    console.log("groupIds", groupIds);
     const newDeck = await prisma.deck.create({
       data: {
         title,

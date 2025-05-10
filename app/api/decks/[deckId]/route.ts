@@ -34,9 +34,9 @@ export async function GET(req: NextRequest, { params }: { params: { deckId: stri
       return NextResponse.json({ error: 'Deck not found' }, { status: 404 });
     }
     const totalCards = deck.cards.length;
-    const masteredCount = deck.cards.filter(card => card.mastered).length;
-    const strugglingCount = deck.cards.filter(card => !card.mastered).length;
-    const unlearnedCount = 0; // 未学習は0と仮定
+    const masteredCount = deck.cards.filter(card => card.status === 'MASTERED').length;
+    const strugglingCount = deck.cards.filter(card => card.status === 'STRUGGLING').length;
+    const unlearnedCount = deck.cards.filter(card => card.status === 'UNLEARNED').length;
     const stats = {
       mastered: totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0,
       struggling: totalCards > 0 ? Math.round((strugglingCount / totalCards) * 100) : 0,

@@ -1,17 +1,18 @@
-// app/dashboard/page.tsx (あるいは pages/dashboard.tsx)
+// app/dashboard/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Group } from '@prisma/client';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { DashboardShell } from '@/components/dashboard/shell';
 import { DeckList } from '@/components/dashboard/deck-list';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
-import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 
 export default function DashboardPage() {
-  const [decks, setDecks] = useState<(Deck & { groups: Group[] })[]>([]);
+  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [newGroupName, setNewGroupName] = useState<string>('');
@@ -19,43 +20,48 @@ export default function DashboardPage() {
   const [groupMode, setGroupMode] = useState<boolean>(false);
 
   useEffect(() => {
-    // DBからデッキ一覧を取得
+    // デッキ一覧取得（cards／groups がない場合は空配列で初期化）
     fetch('/api/decks')
       .then(res => res.json())
-      .then(data => setDecks(data))
-      .catch(e => {
-        console.error('デッキ取得エラー:', e);
-        // 必要ならエラー表示
-      });
+      .then((data: Partial<DeckWithCardsAndGroups>[]) => {
+        const mapped = data.map(d => ({
+          ...d,
+          cards: d.cards ?? [],
+          groups: d.groups ?? [],
+        })) as DeckWithCardsAndGroups[];
+        setDecks(mapped);
+      })
+      .catch(e => console.error('デッキ取得エラー:', e));
+
+    // グループ一覧取得
     fetch('/api/groups')
       .then(res => res.json())
-      .then(data => {
-        // 先頭に「すべて」を追加
+      .then((data: Group[]) => {
         setGroups([{ id: 'all', name: 'すべて' }, ...data]);
       })
       .catch(e => console.error('グループ取得エラー:', e));
   }, []);
 
-  // フィルタリング
+  // グループ選択フィルタリング
   const filteredDecks = selectedGroup === 'all'
     ? decks
     : decks.filter(d => d.groups.some(g => g.id === selectedGroup));
 
-  // グループ追加
+  // 新規グループ作成
   const handleAddGroup = async () => {
     if (!newGroupName.trim()) return;
     try {
       const res = await fetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newGroupName.trim() })
+        body: JSON.stringify({ name: newGroupName.trim() }),
       });
-      if (!res.ok) throw new Error('グループ作成失敗');
+      if (!res.ok) throw new Error();
       const newGroup = await res.json();
       setGroups(prev => [...prev, newGroup]);
       setNewGroupName('');
       setShowGroupInput(false);
-    } catch (e) {
+    } catch {
       alert('グループ作成に失敗しました');
     }
   };
@@ -80,57 +86,50 @@ export default function DashboardPage() {
         </Link>
       </DashboardHeader>
 
-      <div className="flex flex-row gap-0 min-h-[600px]">
-        {/* メイン：デッキリスト */}
+      <div className="flex">
         <div className="flex-1">
-          <DeckList decks={filteredDecks} groupMode={groupMode} groups={groups} setDecks={setDecks} />
+          <DeckList
+            decks={filteredDecks}
+            groupMode={groupMode}
+            groups={groups}
+            setDecks={setDecks}
+          />
         </div>
 
-        {/* サイドバー：縦タブグループ */}
-        <div className="flex flex-col items-center gap-2 ml-4 py-4" style={{ width: 90 }}>
+        <div className="flex flex-col items-center ml-4 py-4" style={{ width: 90 }}>
           {groups.map(group => (
             <button
               key={group.id}
-              className={`w-[80px] h-[56px] flex items-center justify-center
-                rounded-l-lg border-l-4 transition-colors duration-150
-                ${selectedGroup === group.id
-                  ? 'bg-primary text-white border-primary shadow-md'
-                  : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200 hover:text-gray-700'
-                }`}
-              style={{
-                fontWeight: selectedGroup === group.id ? 'bold' : 'normal',
-                fontSize: 16,
-                letterSpacing: 1
-              }}
               onClick={() => setSelectedGroup(group.id)}
+              className={`w-[80px] h-[56px] flex items-center justify-center rounded-l-lg border-l-4 transition 
+                ${selectedGroup === group.id
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'
+                }`}
             >
               {group.name}
             </button>
           ))}
 
           {showGroupInput ? (
-            <div className="flex flex-col gap-1 mt-2 w-[80px]">
+            <div className="mt-2 w-[80px]">
               <input
-                className="border rounded px-2 py-1 text-sm"
+                className="w-full border rounded px-2 py-1"
                 value={newGroupName}
                 onChange={e => setNewGroupName(e.target.value)}
-                placeholder="新グループ"
-                onKeyDown={e => { if (e.key === 'Enter') handleAddGroup(); }}
+                onKeyDown={e => e.key === 'Enter' && handleAddGroup()}
                 autoFocus
+                placeholder="新グループ"
               />
-              <div className="flex gap-1">
-                <Button size="sm" className="flex-1" onClick={handleAddGroup}>
-                  追加
-                </Button>
-                <Button size="sm" variant="ghost" className="flex-1" onClick={() => setShowGroupInput(false)}>
-                  ×
-                </Button>
+              <div className="flex gap-1 mt-1">
+                <Button size="sm" className="flex-1" onClick={handleAddGroup}>追加</Button>
+                <Button size="sm" variant="ghost" className="flex-1" onClick={() => setShowGroupInput(false)}>×</Button>
               </div>
             </div>
           ) : (
             <button
-              className="w-[80px] h-[40px] mt-2 text-primary bg-white border border-dashed border-primary rounded-l-lg hover:bg-primary/10 transition-colors"
               onClick={() => setShowGroupInput(true)}
+              className="w-[80px] h-[40px] mt-2 border-dashed border-primary text-primary rounded-l-lg hover:bg-primary/10"
             >
               ＋新規
             </button>

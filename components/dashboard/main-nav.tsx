@@ -16,13 +16,14 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 
 interface MainNavProps {
-  groups?: Group[];
-  decks?: (Deck & { groups: Group[] })[];
-  setDecks?: React.Dispatch<React.SetStateAction<(Deck & { groups: Group[] })[]>>;
-  groupMode?: boolean;
-  setGroupMode?: (mode: boolean) => void;
+  groups: Group[];
+  decks: DeckWithCardsAndGroups[];
+  setDecks: React.Dispatch<React.SetStateAction<DeckWithCardsAndGroups[]>>;
+  groupMode: boolean;
+  setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function MainNav({

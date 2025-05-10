@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-interface DeckWithCardsAndGroups extends Deck {
+export interface DeckWithCardsAndGroups extends Deck {
   cards: { id: string; status: string }[];
   groups: Group[];
 }

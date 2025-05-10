@@ -11,15 +11,24 @@ import Link from 'next/link';
 import { AiGenerateForm } from '@/components/cards/ai-generate-form';
 import { ManualCreateForm } from '@/components/cards/manual-create-form';
 import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 
 export default function CreatePage() {
   const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<(Deck & { groups: Group[] })[]>([]);
+  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
 
   useEffect(() => {
     fetch('/api/groups').then(res => res.json()).then(setGroups);
-    fetch('/api/decks').then(res => res.json()).then(setDecks);
+    fetch('/api/decks')
+      .then(res => res.json())
+      .then((data) => {
+        const decksWithCards: DeckWithCardsAndGroups[] = data.map((deck: any) => ({
+          ...deck,
+          cards: deck.cards ?? [],
+        }));
+        setDecks(decksWithCards);
+      });
   }, []);
 
   return (

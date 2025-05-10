@@ -13,6 +13,7 @@ import { BrainCircuit } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { signIn } from 'next-auth/react';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -47,9 +48,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      // Simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      router.push('/dashboard');
+      await signIn('google');
     } catch (error) {
       toast.error('エラーが発生しました');
     } finally {
