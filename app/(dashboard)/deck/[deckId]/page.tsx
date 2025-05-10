@@ -1,0 +1,298 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { DashboardHeader } from '@/components/dashboard/header';
+import { DashboardShell } from '@/components/dashboard/shell';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Home, BookOpen, LineChart } from 'lucide-react';
+import Link from 'next/link';
+import { PieChart, Pie, Cell, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Deck, Group } from '@prisma/client';
+
+// Mock data for development
+const mockDeckData = {
+  '1': {
+    title: '英語2',
+    description: '英語2のスピーキング構文',
+    cardCount: 35,
+    stats: {
+      mastered: 70,
+      struggling: 20,
+      unlearned: 10,
+    },
+    progressHistory: [
+      { date: '三日前', progress: 20 },
+      { date: '昨日', progress: 35 },
+      { date: '一昨日', progress: 30 },
+      { date: '今日', progress: 40 },
+      { date: '今日', progress: 45 },
+      { date: '今日', progress: 70 },
+    ],
+  },
+};
+
+const COLORS = ['#4ade80', '#f87171', '#e5e7eb'];
+
+// 相対時間を計算する関数
+const getRelativeTime = (dateString: string) => {
+  const now = new Date();
+  const date = new Date(dateString);
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const months = Math.floor(days / 30);
+
+  if (months > 0) return `${months}ヶ月前`;
+  if (days > 0) return `${days}日前`;
+  if (hours > 0) return `${hours}時間前`;
+  if (minutes > 0) return `${minutes}分前`;
+  return '今';
+};
+
+interface StudyHistory {
+  progress: number;
+  createdAt: string;
+}
+
+export default function DeckDetailsPage() {
+  const router = useRouter();
+  const { deckId } = useParams();
+
+  // 追加: DashboardShell用のstate
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [decks, setDecks] = useState<(Deck & { groups: Group[] })[]>([]);
+  const [groupMode, setGroupMode] = useState(false);
+  const [deckData, setDeckData] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/groups').then(res => res.json()).then(setGroups);
+    fetch('/api/decks').then(res => res.json()).then(setDecks);
+    console.log(deckId);
+  }, []);
+
+  useEffect(() => {
+    if (!deckId) return;
+    fetch(`/api/decks/${deckId}`)
+      .then(async res => {
+        if (!res.ok) {
+          // エラー時はnullをセット
+          setDeckData(null);
+          return;
+        }
+        // レスポンスが空の場合もnull
+        const text = await res.text();
+        if (!text) {
+          setDeckData(null);
+          return;
+        }
+        console.log(text);
+        setDeckData(JSON.parse(text));
+      });
+  }, [deckId]);
+
+  if (!deckId) {
+    // パラメータがまだ取得できていない場合
+    return (
+      <DashboardShell
+        groups={groups}
+        decks={decks}
+        setDecks={setDecks}
+        groupMode={groupMode}
+        setGroupMode={setGroupMode}
+      >
+        <div className="w-full text-center py-20 text-lg text-muted-foreground">
+          データを取得中...
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  if (!deckData) {
+    // パラメータはあるが該当データがない場合
+    return (
+      <DashboardShell
+        groups={groups}
+        decks={decks}
+        setDecks={setDecks}
+        groupMode={groupMode}
+        setGroupMode={setGroupMode}
+      >
+        <div className="w-full text-center py-20 text-lg text-destructive">
+          デッキが見つかりません
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  const totalCards = deckData.cards.length;
+  const masteredCount = deckData.cards.filter((card: { status: string }) => card.status === 'MASTERED').length;
+  const strugglingCount = deckData.cards.filter((card: { status: string }) => card.status === 'STRUGGLING').length;
+  const unlearnedCount = deckData.cards.filter((card: { status: string }) => card.status === 'UNLEARNED').length;
+
+  const masteredPercentage = totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0;
+  const strugglingPercentage = totalCards > 0 ? Math.round((strugglingCount / totalCards) * 100) : 0;
+  const unlearnedPercentage = totalCards > 0 ? Math.round((unlearnedCount / totalCards) * 100) : 0;
+
+  const pieData = [
+    {
+      name: '覚えた',
+      value: deckData.cards.filter((card: { status: string }) => card.status === 'MASTERED').length,
+      color: '#4ade80'
+    },
+    {
+      name: '苦手',
+      value: deckData.cards.filter((card: { status: string }) => card.status === 'STRUGGLING').length,
+      color: '#f87171'
+    },
+    {
+      name: '未学習',
+      value: deckData.cards.filter((card: { status: string }) => card.status === 'UNLEARNED').length,
+      color: '#9ca3af'
+    }
+  ];
+
+  // グラフデータの準備
+  const chartData = deckData.progressHistory
+    .map((history: StudyHistory) => ({
+      ...history,
+      date: getRelativeTime(history.createdAt)
+    }))
+    .reverse(); // 古い順に並び替え
+
+  return (
+    <DashboardShell
+      groups={groups}
+      decks={decks}
+      setDecks={setDecks}
+      groupMode={groupMode}
+      setGroupMode={setGroupMode}
+    >
+      <DashboardHeader
+        heading={deckData.title}
+        description={deckData.description}
+      >
+        <Link href="/dashboard">
+          <Button variant="outline" className="h-10">
+            <Home className="mr-2 h-4 w-4" />
+            ダッシュボードへ
+          </Button>
+        </Link>
+      </DashboardHeader>
+
+      <div className="grid gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* 学習状況 */}
+          <Card className="shadow-lg rounded-2xl border-0">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-primary">学習状況</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center">
+              <PieChart width={220} height={220}>
+                <Pie
+                  data={pieData}
+                  cx={110}
+                  cy={110}
+                  innerRadius={70}
+                  outerRadius={100}
+                  paddingAngle={2}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+              <div className="mt-6 space-y-3 w-full">
+                <div className="flex items-center justify-between text-base">
+                  <div className="flex items-center">
+                    <span className="inline-block w-4 h-4 rounded-full bg-[#4ade80] mr-2" />
+                    <span>覚えた</span>
+                  </div>
+                  <span className="font-bold text-[#4ade80]">{masteredPercentage}%</span>
+                </div>
+                <div className="flex items-center justify-between text-base">
+                  <div className="flex items-center">
+                    <span className="inline-block w-4 h-4 rounded-full bg-[#f87171] mr-2" />
+                    <span>苦手</span>
+                  </div>
+                  <span className="font-bold text-[#f87171]">{strugglingPercentage}%</span>
+                </div>
+                <div className="flex items-center justify-between text-base">
+                  <div className="flex items-center">
+                    <span className="inline-block w-4 h-4 rounded-full bg-[#9ca3af] mr-2" />
+                    <span>未学習</span>
+                  </div>
+                  <span className="font-bold text-[#9ca3af]">{unlearnedPercentage}%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 学習の推移 */}
+          <Card className="shadow-lg rounded-2xl border-0">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-primary">暗記レベルの推移（直近15回）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="w-full h-[320px]">
+                <ResponsiveContainer width="100%" height={320}>
+                  <RechartsLineChart
+                    data={chartData.slice(-15)}
+                    margin={{ top: 20, right: 40, bottom: 20, left: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis 
+                      domain={[0, 100]} 
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => `${value}%`}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [`${value}%`, '進捗率']}
+                      labelFormatter={(label) => `学習日時: ${label}`}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="progress"
+                      stroke="#8b5cf6"
+                      strokeWidth={3}
+                      dot={{ r: 5, stroke: "#8b5cf6", strokeWidth: 2, fill: "#fff" }}
+                      activeDot={{ r: 8 }}
+                    />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* アクションボタン */}
+        <div className="flex flex-col sm:flex-row justify-center gap-6 mt-8">
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1 max-w-xs text-base py-6 rounded-xl shadow"
+            onClick={() => router.push(`/deck/${deckId}/cards`)}
+          >
+            <BookOpen className="mr-2 h-5 w-5" />
+            カードリスト
+          </Button>
+          <Link href={`/study/${deckId}`} className="flex-1 max-w-xs">
+            <Button size="lg" className="w-full text-base py-6 rounded-xl shadow bg-primary text-white hover:bg-primary/90">
+              <LineChart className="mr-2 h-5 w-5" />
+              学習開始
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </DashboardShell>
+  );
+}

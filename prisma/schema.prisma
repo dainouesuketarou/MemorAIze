@@ -1,0 +1,49 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Group {
+    id    String @id @default(uuid())
+    name  String @unique
+    decks Deck[] @relation("DeckGroups")
+}
+
+model Deck {
+    id           String         @id @default(uuid())
+    title        String
+    description  String?
+    lastStudied  DateTime?
+    cardCount    Int
+    progress     Float
+    groups       Group[]        @relation("DeckGroups")
+    cards        Card[]
+    StudyHistory StudyHistory[]
+}
+
+enum CardStatus {
+    UNLEARNED // 未学習
+    MASTERED // 覚えた
+    STRUGGLING // 苦手
+}
+
+model Card {
+    id     String     @id @default(uuid())
+    front  String
+    back   String
+    status CardStatus @default(UNLEARNED)
+    deck   Deck       @relation(fields: [deckId], references: [id])
+    deckId String
+}
+
+model StudyHistory {
+    id        String   @id @default(uuid())
+    deckId    String
+    deck      Deck     @relation(fields: [deckId], references: [id])
+    progress  Int // 進捗率（0-100）
+    createdAt DateTime @default(now())
+}

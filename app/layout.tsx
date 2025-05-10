@@ -1,0 +1,32 @@
+import './globals.css';
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { Providers } from '@/components/providers';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from '@/components/ui/toaster';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'MemorAIze - AI-Powered Memorization Assistant',
+  description: 'Enhance your learning with AI-generated flashcards and smart study tools',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="light">
+          <Providers>
+            {children}
+            <Toaster />
+          </Providers>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}

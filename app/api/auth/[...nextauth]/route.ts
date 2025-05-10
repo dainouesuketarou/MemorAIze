@@ -1,0 +1,43 @@
+// app/api/auth/[...nextauth]/route.ts
+import NextAuth, { type NextAuthOptions } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
+import EmailProvider from "next-auth/providers/email";
+
+/** ★ ここが肝心 ── Node ランタイムを強制 */
+export const runtime = "nodejs";
+/** ★ ついでに SSG 判定も避ける */
+export const dynamic = "force-dynamic";
+
+/** 設定は変数に切り出して、getServerSession でも再利用できるよう export しておく */
+export const authOptions: NextAuthOptions = {
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    EmailProvider({
+      server: process.env.EMAIL_SERVER,
+      from: process.env.EMAIL_FROM,
+    }),
+  ],
+  pages: {
+    signIn: "/login",
+    verifyRequest: "/auth/verify-request",
+    error: "/auth/error",
+  },
+  callbacks: {
+    /** ここで token 情報を session に載せる場合は user も受け取る */
+    async session({ session, token, user }) {
+      return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // 認証後は常に /dashboard へ
+      return `${baseUrl}/dashboard`;
+    },
+  },
+};
+
+const handler = NextAuth(authOptions);
+
+/** App Router 用の re‑export */
+export { handler as GET, handler as POST };
