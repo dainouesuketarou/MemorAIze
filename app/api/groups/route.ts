@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 const prisma = new PrismaClient();
 
@@ -13,6 +15,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+  }
+
   const data = await req.json();
   const { name } = data;
   if (!name) {
@@ -20,7 +27,10 @@ export async function POST(req: NextRequest) {
   }
   try {
     const newGroup = await prisma.group.create({
-      data: { name }
+      data: { 
+        name,
+        userId: session.user.id
+      }
     });
     return NextResponse.json(newGroup);
   } catch (e) {

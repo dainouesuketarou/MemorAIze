@@ -5,24 +5,15 @@ import { usePathname } from 'next/navigation';
 import { BrainCircuit, FileText, Group as GroupIcon, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogClose
-} from '@/components/ui/dialog';
-import { Deck, Group } from '@prisma/client';
+import { Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 
 interface MainNavProps {
-  groups?: Group[];
-  decks?: (Deck & { groups: Group[] })[];
-  setDecks?: React.Dispatch<React.SetStateAction<(Deck & { groups: Group[] })[]>>;
-  groupMode?: boolean;
-  setGroupMode?: (mode: boolean) => void;
+  groups: Group[];
+  decks: DeckWithCardsAndGroups[];
+  setDecks: React.Dispatch<React.SetStateAction<DeckWithCardsAndGroups[]>>;
+  groupMode: boolean;
+  setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function MainNav({
@@ -33,26 +24,6 @@ export function MainNav({
   setGroupMode = () => {},
 }: MainNavProps) {
   const pathname = usePathname();
-
-  // デッキの分野（グループ）追加・削除
-  const addDeckToGroup = (deckId: string, groupId: string) => {
-    setDecks((prev) =>
-      prev.map((deck) =>
-        deck.id === deckId && !deck.groups.some(g => g.id === groupId)
-          ? { ...deck, groups: [...deck.groups, { id: groupId, name: '' }] }
-          : deck
-      )
-    );
-  };
-  const removeDeckFromGroup = (deckId: string, groupId: string) => {
-    setDecks((prev) =>
-      prev.map((deck) =>
-        deck.id === deckId
-          ? { ...deck, groups: deck.groups.filter((g) => g.id !== groupId) }
-          : deck
-      )
-    );
-  };
 
   return (
     <div className="flex items-center">

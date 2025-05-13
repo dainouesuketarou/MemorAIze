@@ -11,16 +11,45 @@ import Link from 'next/link';
 import { AiGenerateForm } from '@/components/cards/ai-generate-form';
 import { ManualCreateForm } from '@/components/cards/manual-create-form';
 import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
+import { useSession } from 'next-auth/react';
 
 export default function CreatePage() {
+  const { data: session } = useSession();
   const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<(Deck & { groups: Group[] })[]>([]);
+  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
 
   useEffect(() => {
+    if (!session?.user?.id) return;
+
     fetch('/api/groups').then(res => res.json()).then(setGroups);
-    fetch('/api/decks').then(res => res.json()).then(setDecks);
-  }, []);
+    fetch('/api/decks')
+      .then(res => res.json())
+      .then((data) => {
+        const decksWithCards: DeckWithCardsAndGroups[] = data.map((deck: any) => ({
+          ...deck,
+          cards: deck.cards ?? [],
+        }));
+        setDecks(decksWithCards);
+      });
+  }, [session]);
+
+  if (!session?.user?.id) {
+    return (
+      <DashboardShell
+        groups={groups}
+        decks={decks}
+        setDecks={setDecks}
+        groupMode={groupMode}
+        setGroupMode={setGroupMode}
+      >
+        <div className="w-full text-center py-20 text-lg text-muted-foreground">
+          ログインが必要です
+        </div>
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell
@@ -31,62 +60,33 @@ export default function CreatePage() {
       setGroupMode={setGroupMode}
     >
       <DashboardHeader
-        heading="カード作成"
-        description="AI生成または手動で暗記カードを作成します。"
-      />
-      
-      <Tabs defaultValue="ai" className="w-full">
-        <TabsList className="grid grid-cols-2 w-full max-w-md mb-6">
-          <TabsTrigger value="ai">AIで生成</TabsTrigger>
-          <TabsTrigger value="manual">手動で作成</TabsTrigger>
+        heading="新規作成"
+        description="AIで生成または手動で暗記カード帳を作成します。"
+      >
+        <Link href="/dashboard">
+          <Button variant="outline">
+            <Home className="mr-2 h-4 w-4" />
+            ダッシュボードへ
+          </Button>
+        </Link>
+      </DashboardHeader>
+
+      <Tabs defaultValue="ai" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="ai">
+            <Brain className="mr-2 h-4 w-4" />
+            AI生成
+          </TabsTrigger>
+          <TabsTrigger value="manual">
+            <Hand className="mr-2 h-4 w-4" />
+            手動作成
+          </TabsTrigger>
         </TabsList>
-        
         <TabsContent value="ai">
-          <div className="grid gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">AIでカードを自動生成</CardTitle>
-                <CardDescription>
-                  テキスト、PDF、または画像から暗記カードを生成します
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AiGenerateForm />
-              </CardContent>
-              <CardFooter className="flex justify-between border-t pt-6">
-                <Link href="/dashboard">
-                  <Button variant="outline">
-                    <Home className="mr-2 h-4 w-4" />
-                    ホームに戻る
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
-          </div>
+          <AiGenerateForm />
         </TabsContent>
-        
         <TabsContent value="manual">
-          <div className="grid gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">カードを手動作成</CardTitle>
-                <CardDescription>
-                  暗記カードを自分で作成します
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ManualCreateForm />
-              </CardContent>
-              <CardFooter className="flex justify-between border-t pt-6">
-                <Link href="/dashboard">
-                  <Button variant="outline">
-                    <Home className="mr-2 h-4 w-4" />
-                    ホームに戻る
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
-          </div>
+          <ManualCreateForm />
         </TabsContent>
       </Tabs>
     </DashboardShell>
