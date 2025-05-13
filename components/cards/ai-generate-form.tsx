@@ -30,6 +30,8 @@ import {
 import { LoaderCircle, MinusCircle, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { GeneratingCards } from './generating-cards';
+import { PreviewCards } from './preview-cards';
 
 const formSchema = z.object({
   title: z.string().min(2, {
@@ -45,7 +47,13 @@ const formSchema = z.object({
 export function AiGenerateForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [generatedCards, setGeneratedCards] = useState<{
+    title: string;
+    cards: Array<{ id: string; front: string; back: string; }>;
+  } | null>(null);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -58,17 +66,88 @@ export function AiGenerateForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    setError(null);
     
-    // Mock API call for demo
-    setTimeout(() => {
-      console.log(values);
-      console.log('Uploaded files:', uploadedFiles);
+    try {
+      if (!values.content && uploadedFiles.length === 0) {
+        throw new Error('テキスト入力またはファイルアップロードが必要です');
+      }
+
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...values,
+          uploadedFiles: uploadedFiles.map(file => ({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '暗記カードの生成に失敗しました');
+      }
+
+      if (!data.data?.cards?.length) {
+        throw new Error('カードの生成に失敗しました');
+      }
+
+      setGeneratedCards(data.data);
+    } catch (error) {
+      console.error('Error generating cards:', error);
+      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました');
+    } finally {
       setIsLoading(false);
-      router.push('/dashboard');
-    }, 2000);
+    }
   }
+
+  const handleSave = async () => {
+    if (!generatedCards) return;
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/decks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: generatedCards.title,
+          cards: generatedCards.cards.map(card => ({
+            front: card.front,
+            back: card.back,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'デッキの保存に失敗しました');
+      }
+
+      if (!data.success) {
+        throw new Error('デッキの保存に失敗しました');
+      }
+
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error saving deck:', error);
+      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -93,220 +172,236 @@ export function AiGenerateForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>暗記カード帳のタイトル</FormLabel>
-              <FormControl>
-                <Input placeholder="例）英検準一級英単語" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+      {isLoading ? (
+        <GeneratingCards />
+      ) : generatedCards ? (
+        <PreviewCards
+          title={generatedCards.title}
+          cards={generatedCards.cards}
+          onSave={handleSave}
+          isSaving={isSaving}
         />
-        
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-medium mb-2">学習内容</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              テキスト入力、またはファイルアップロードから暗記カードを生成します。
-            </p>
+      ) : (
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {error && (
+            <div className="p-4 bg-destructive/10 text-destructive rounded-md">
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+          )}
+          <FormField
+            control={form.control}
+            name="title"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>暗記カード帳のタイトル</FormLabel>
+                <FormControl>
+                  <Input placeholder="例）英検準一級英単語" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium mb-2">学習内容</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                テキスト入力、またはファイルアップロードから暗記カードを生成します。
+              </p>
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="content"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>テキスト入力</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="例）「英検準一級英単語」、「生物学基礎の定期試験対策」など" 
+                      className="min-h-[120px]" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    学習したい内容のテキストを入力してください。
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="space-y-2">
+              <FormLabel>ファイルアップロード</FormLabel>
+              <div className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                   onClick={() => document.getElementById('file-upload')?.click()}>
+                <Input
+                  id="file-upload"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  multiple
+                />
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">
+                    クリックしてファイルを選択、または
+                    <br />
+                    ファイルをドラッグ＆ドロップ
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    PDF, JPG, PNGがサポートされています (最大1MB)
+                  </div>
+                </div>
+              </div>
+              
+              {uploadedFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-medium">アップロードされたファイル:</p>
+                  <ul className="space-y-2">
+                    {uploadedFiles.map((file, index) => (
+                      <li key={index} className="flex items-center justify-between bg-muted p-2 rounded-md text-sm">
+                        <span className="truncate max-w-xs">{file.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                        >
+                          <MinusCircle className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
           
           <FormField
             control={form.control}
-            name="content"
+            name="cardFormat"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>テキスト入力</FormLabel>
+                <FormLabel>カードの形式</FormLabel>
                 <FormControl>
-                  <Textarea 
-                    placeholder="例）「英検準一級英単語」、「生物学基礎の定期試験対策」など" 
-                    className="min-h-[120px]" 
-                    {...field} 
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    className="flex flex-col space-y-1"
+                  >
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="term-meaning" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        表: 単語、裏: 意味
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="question-answer" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        表: 問題、裏: 答え
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="custom" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        カスタム (追加指示で詳細を指定)
+                      </FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="cardCount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>カード枚数 (1-100)</FormLabel>
+                <div className="flex items-center space-x-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={decreaseCardCount}
+                    disabled={field.value <= 1}
+                    className="h-8 w-8"
+                  >
+                    <MinusCircle className="h-4 w-4" />
+                  </Button>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      className="w-20 text-center"
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
+                    />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={increaseCardCount}
+                    disabled={field.value >= 100}
+                    className="h-8 w-8"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">枚</span>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="additionalInstructions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>追加指示 (オプション)</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="例）「表をフランス語、裏を日本語にしてください」「計算問題を中心に問題作成してください」など"
+                    className="min-h-[80px]"
+                    {...field}
                   />
                 </FormControl>
                 <FormDescription>
-                  学習したい内容のテキストを入力してください。
+                  特別な要望や指示があれば入力してください。
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
           
-          <div className="space-y-2">
-            <FormLabel>ファイルアップロード</FormLabel>
-            <div className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-                 onClick={() => document.getElementById('file-upload')?.click()}>
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                className="hidden"
-                onChange={handleFileChange}
-                multiple
-              />
-              <div className="space-y-2">
-                <div className="text-sm text-muted-foreground">
-                  クリックしてファイルを選択、または
-                  <br />
-                  ファイルをドラッグ＆ドロップ
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  PDF, JPG, PNGがサポートされています (最大1MB)
-                </div>
-              </div>
-            </div>
-            
-            {uploadedFiles.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-sm font-medium">アップロードされたファイル:</p>
-                <ul className="space-y-2">
-                  {uploadedFiles.map((file, index) => (
-                    <li key={index} className="flex items-center justify-between bg-muted p-2 rounded-md text-sm">
-                      <span className="truncate max-w-xs">{file.name}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                      >
-                        <MinusCircle className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                生成中...
+              </>
+            ) : (
+              '暗記カードを生成'
             )}
-          </div>
-        </div>
-        
-        <FormField
-          control={form.control}
-          name="cardFormat"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>カードの形式</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                  className="flex flex-col space-y-1"
-                >
-                  <FormItem className="flex items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <RadioGroupItem value="term-meaning" />
-                    </FormControl>
-                    <FormLabel className="font-normal">
-                      表: 単語、裏: 意味
-                    </FormLabel>
-                  </FormItem>
-                  <FormItem className="flex items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <RadioGroupItem value="question-answer" />
-                    </FormControl>
-                    <FormLabel className="font-normal">
-                      表: 問題、裏: 答え
-                    </FormLabel>
-                  </FormItem>
-                  <FormItem className="flex items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <RadioGroupItem value="custom" />
-                    </FormControl>
-                    <FormLabel className="font-normal">
-                      カスタム (追加指示で詳細を指定)
-                    </FormLabel>
-                  </FormItem>
-                </RadioGroup>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="cardCount"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>カード枚数 (1-100)</FormLabel>
-              <div className="flex items-center space-x-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={decreaseCardCount}
-                  disabled={field.value <= 1}
-                  className="h-8 w-8"
-                >
-                  <MinusCircle className="h-4 w-4" />
-                </Button>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    className="w-20 text-center"
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
-                  />
-                </FormControl>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={increaseCardCount}
-                  disabled={field.value >= 100}
-                  className="h-8 w-8"
-                >
-                  <PlusCircle className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">枚</span>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="additionalInstructions"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>追加指示 (オプション)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="例）「表をフランス語、裏を日本語にしてください」「計算問題を中心に問題作成してください」など"
-                  className="min-h-[80px]"
-                  {...field}
-                />
-              </FormControl>
-              <FormDescription>
-                特別な要望や指示があれば入力してください。
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <Button 
-          type="submit" 
-          className="w-full" 
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-              生成中...
-            </>
-          ) : (
-            '暗記カードを生成'
-          )}
-        </Button>
-      </form>
+          </Button>
+        </form>
+      )}
     </Form>
   );
 }

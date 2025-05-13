@@ -31,8 +31,11 @@ import {
   DialogTitle,
   DialogDescription,
   DialogClose,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 export interface DeckWithCardsAndGroups extends Deck {
   cards: { id: string; status: string }[];
@@ -56,6 +59,9 @@ export function DeckList({ decks, groupMode, groups, setDecks }: DeckListProps) 
   // 分野モーダル用
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDeck, setSelectedDeck] = useState<DeckWithCardsAndGroups|null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deckToDelete, setDeckToDelete] = useState<DeckWithCardsAndGroups | null>(null);
+  const router = useRouter();
 
   // 親の decks が変わったら更新
   useEffect(() => {
@@ -135,6 +141,31 @@ export function DeckList({ decks, groupMode, groups, setDecks }: DeckListProps) 
     }
   }, [localDecks, selectedDeck]);
 
+  const handleDelete = async () => {
+    if (!deckToDelete) return;
+    
+    try {
+      const response = await fetch(`/api/decks/${deckToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete deck");
+      }
+
+      // 削除成功後、デッキリストを更新
+      const updatedDecks = localDecks.filter(deck => deck.id !== deckToDelete.id);
+      setLocalDecks(updatedDecks);
+      setDecks(updatedDecks);
+
+      toast.success("暗記帳を削除しました");
+      setDeleteModalOpen(false);
+      setDeckToDelete(null);
+    } catch (error) {
+      toast.error("暗記帳の削除に失敗しました");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 進捗タブ + ソートメニュー */}
@@ -193,7 +224,32 @@ export function DeckList({ decks, groupMode, groups, setDecks }: DeckListProps) 
                     {deck.description}
                   </CardDescription>
                 </div>
-                <MoreHorizontal className="h-6 w-6 text-muted-foreground"/>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-6 w-6 text-muted-foreground"/>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedDeck(deck);
+                      setModalOpen(true);
+                    }}>
+                      グループ化
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeckToDelete(deck);
+                        setDeleteModalOpen(true);
+                      }}
+                      className="text-red-600"
+                    >
+                      削除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </CardHeader>
             <CardContent>
@@ -302,6 +358,26 @@ export function DeckList({ decks, groupMode, groups, setDecks }: DeckListProps) 
           <DialogClose asChild>
             <Button variant="outline" className="w-full mt-4">閉じる</Button>
           </DialogClose>
+        </DialogContent>
+      </Dialog>
+
+      {/* 削除確認モーダル */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>暗記帳の削除</DialogTitle>
+            <DialogDescription>
+              この暗記帳を削除してもよろしいですか？この操作は取り消せません。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+              キャンセル
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              削除
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

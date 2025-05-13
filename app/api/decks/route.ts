@@ -2,69 +2,66 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { z } from 'zod';
+
+const createDeckSchema = z.object({
+  title: z.string().min(2),
+  cards: z.array(z.object({
+    front: z.string(),
+    back: z.string(),
+  })),
+});
 
 const prisma = new PrismaClient();
 
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
-
-  const data = await req.json();
-  const { title, description, groupIds, newGroups, cardCount, progress, lastStudied, cards } = data;
-
+export async function POST(req: Request) {
   try {
-    // 新しいグループを作成
-    const createdGroups = await Promise.all(
-      (newGroups || []).map(async (group: { name: string; description?: string }) => {
-        if (!session.user?.id) throw new Error("User ID is required");
-        return prisma.group.create({
-          data: {
-            name: group.name,
-            description: group.description || null,
-            userId: session.user.id,
-          },
-        });
-      })
-    );
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: '認証が必要です' },
+        { status: 401 }
+      );
+    }
 
-    // 既存のグループIDと新しく作成したグループのIDを結合
-    const allGroupIds = [
-      ...(groupIds || []),
-      ...createdGroups.map(group => group.id)
-    ];
+    const body = await req.json();
+    const validatedData = createDeckSchema.parse(body);
 
-    const newDeck = await prisma.deck.create({
+    const deck = await prisma.deck.create({
       data: {
-        title,
-        description,
-        cardCount,
-        progress,
-        lastStudied: lastStudied ? new Date(lastStudied) : null,
+        title: validatedData.title,
         userId: session.user.id,
-        groups: {
-          connect: allGroupIds.map((id: string) => ({ id }))
-        },
+        cardCount: validatedData.cards.length,
+        progress: 0,
         cards: {
-          create: (cards || []).map((c: { front: string; back: string }) => ({ front: c.front, back: c.back }))
-        }
+          create: validatedData.cards.map((card, index) => ({
+            front: card.front,
+            back: card.back,
+            order: index,
+            status: 'UNLEARNED',
+          })),
+        },
       },
-      include: { 
-        groups: true, 
-        cards: true 
-      }
+      include: {
+        cards: true,
+      },
     });
 
     return NextResponse.json({
-      deck: newDeck,
-      createdGroups: createdGroups
+      success: true,
+      data: deck,
     });
-  } catch (e) {
-    console.error("Error creating deck:", e);
-    return NextResponse.json({ error: 'DB保存エラー', detail: String(e) }, { status: 500 });
+  } catch (error) {
+    console.error('Error creating deck:', error);
+    return NextResponse.json(
+      { 
+        error: 'デッキの作成に失敗しました',
+        details: error instanceof Error ? error.message : '不明なエラーが発生しました'
+      },
+      { status: 400 }
+    );
   }
-} 
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions);
