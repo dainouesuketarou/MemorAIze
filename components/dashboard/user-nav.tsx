@@ -11,9 +11,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CreditCard, Settings, User, LogOut } from 'lucide-react';
-import Link from 'next/link';
+import { signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export function UserNav() {
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut({ 
+      redirect: false,
+      callbackUrl: '/login'
+    });
+    router.push('/login');
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -47,9 +58,9 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
-          <Link href="/">ログアウト</Link>
+          <span>ログアウト</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

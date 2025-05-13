@@ -66,9 +66,12 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const deckId = params.deckId;
+
+    // デッキの存在確認と所有者確認
     const deck = await prisma.deck.findUnique({
       where: {
-        id: params.deckId,
+        id: deckId,
         userId: session.user.id,
       },
     });
@@ -77,10 +80,28 @@ export async function DELETE(
       return new NextResponse("Deck not found", { status: 404 });
     }
 
-    await prisma.deck.delete({
-      where: {
-        id: params.deckId,
-      },
+    // トランザクションで関連データを削除
+    await prisma.$transaction(async (tx) => {
+      // デッキに関連するカードを削除
+      await tx.card.deleteMany({
+        where: {
+          deckId: deckId,
+        },
+      });
+
+      // デッキに関連する学習履歴を削除
+      await tx.studyHistory.deleteMany({
+        where: {
+          deckId: deckId,
+        },
+      });
+
+      // デッキを削除
+      await tx.deck.delete({
+        where: {
+          id: deckId,
+        },
+      });
     });
 
     return new NextResponse(null, { status: 204 });
