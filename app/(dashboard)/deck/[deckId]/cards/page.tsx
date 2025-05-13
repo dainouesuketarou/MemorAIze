@@ -10,6 +10,7 @@ import { Book, Home, Plus, Trash2, Edit2, Volume2, Star, AlertCircle } from 'luc
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/types/deck';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CardAddAiForm } from '@/components/cards/card-add-ai-form';
@@ -21,7 +22,7 @@ export default function CardsPage() {
 
   // DashboardShell用のstate
   const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<(Deck & { groups: Group[] })[]>([]);
+  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [cards, setCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +31,12 @@ export default function CardsPage() {
 
   useEffect(() => {
     fetch('/api/groups').then(res => res.json()).then(setGroups);
-    fetch('/api/decks').then(res => res.json()).then(setDecks);
+    fetch('/api/decks').then(res => res.json()).then((data) => {
+      setDecks(data.map((deck: any) => ({
+        ...deck,
+        cards: deck.cards || []
+      })));
+    });
   }, []);
 
   useEffect(() => {

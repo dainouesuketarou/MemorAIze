@@ -10,30 +10,8 @@ import { Home, BookOpen, LineChart } from 'lucide-react';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/types/deck';
 
-// Mock data for development
-const mockDeckData = {
-  '1': {
-    title: '英語2',
-    description: '英語2のスピーキング構文',
-    cardCount: 35,
-    stats: {
-      mastered: 70,
-      struggling: 20,
-      unlearned: 10,
-    },
-    progressHistory: [
-      { date: '三日前', progress: 20 },
-      { date: '昨日', progress: 35 },
-      { date: '一昨日', progress: 30 },
-      { date: '今日', progress: 40 },
-      { date: '今日', progress: 45 },
-      { date: '今日', progress: 70 },
-    ],
-  },
-};
-
-const COLORS = ['#4ade80', '#f87171', '#e5e7eb'];
 
 // 相対時間を計算する関数
 const getRelativeTime = (dateString: string) => {
@@ -63,13 +41,18 @@ export default function DeckDetailsPage() {
 
   // 追加: DashboardShell用のstate
   const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<(Deck & { groups: Group[] })[]>([]);
+  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [deckData, setDeckData] = useState<any>(null);
 
   useEffect(() => {
     fetch('/api/groups').then(res => res.json()).then(setGroups);
-    fetch('/api/decks').then(res => res.json()).then(setDecks);
+    fetch('/api/decks').then(res => res.json()).then((data) => {
+      setDecks(data.map((deck: any) => ({
+        ...deck,
+        cards: deck.cards || []
+      })));
+    });
     console.log(deckId);
   }, []);
 

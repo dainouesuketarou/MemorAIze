@@ -8,9 +8,12 @@ datasource db {
 }
 
 model Group {
-    id    String @id @default(uuid())
-    name  String @unique
-    decks Deck[] @relation("DeckGroups")
+    id          String  @id @default(uuid())
+    name        String  @unique
+    description String?
+    userId      String
+    user        User    @relation(fields: [userId], references: [id])
+    decks       Deck[]  @relation("DeckGroups")
 }
 
 model Deck {
@@ -23,6 +26,8 @@ model Deck {
     groups       Group[]        @relation("DeckGroups")
     cards        Card[]
     StudyHistory StudyHistory[]
+    userId       String
+    user         User           @relation(fields: [userId], references: [id])
 }
 
 enum CardStatus {
@@ -57,4 +62,6 @@ model User {
     providerAccountId String
     createdAt         DateTime @default(now())
     updatedAt         DateTime @updatedAt
+    decks             Deck[]
+    Group             Group[]
 }

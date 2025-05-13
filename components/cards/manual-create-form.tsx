@@ -43,13 +43,6 @@ type CardType = {
   isNew?: boolean;
 };
 
-// グループのモックデータ（ダッシュボードと同じものを利用）
-const mockGroups: Group[] = [
-  { id: 'english', name: '英語' },
-  { id: 'biology', name: '生物学基礎' },
-  { id: 'gifu', name: '岐阜学' },
-];
-
 export function ManualCreateForm() {
   const router = useRouter();
   const [cards, setCards] = useState<CardType[]>([
@@ -58,7 +51,6 @@ export function ManualCreateForm() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentCardId, setCurrentCardId] = useState('1');
-  // Deckは複数の分野（グループ）に属せるので、groupId配列で管理
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -66,6 +58,9 @@ export function ManualCreateForm() {
       .then(res => res.json())
       .then(data => {
         setGroups(data);
+        if (data.length > 0) {
+          setSelectedGroupIds([data[0].id]);
+        }
       })
       .catch(e => console.error('グループ取得エラー:', e));
   }, []);
@@ -89,6 +84,7 @@ export function ManualCreateForm() {
   });
   
   const addNewCard = () => {
+    // Save current card first
     saveCurrentCard();
     
     const newId = Date.now().toString();
@@ -96,6 +92,7 @@ export function ManualCreateForm() {
     setCards([...cards, newCard]);
     setCurrentCardId(newId);
     
+    // Reset card form
     cardForm.reset({
       front: '',
       back: '',
@@ -233,26 +230,26 @@ export function ManualCreateForm() {
           
           {/* グループ選択チェックボックス */}
           <div>
-    <label className="block text-sm font-medium mb-1">分野（複数選択可）</label>
-    <div className="flex flex-wrap gap-2">
-      {groups.map(group => (
-        <label key={group.id} className="flex items-center gap-1 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={selectedGroupIds.includes(group.id)}
-            onChange={e => {
-              if (e.target.checked) {
-                setSelectedGroupIds(prev => [...prev, group.id]);
-              } else {
-                setSelectedGroupIds(prev => prev.filter(id => id !== group.id));
-              }
-            }}
-          />
-          <span>{group.name}</span>
-        </label>
-      ))}
-    </div>
-  </div>
+            <label className="block text-sm font-medium mb-1">分野（複数選択可）</label>
+            <div className="flex flex-wrap gap-2">
+              {groups.map(group => (
+                <label key={group.id} className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedGroupIds.includes(group.id)}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setSelectedGroupIds(prev => [...prev, group.id]);
+                      } else {
+                        setSelectedGroupIds(prev => prev.filter(id => id !== group.id));
+                      }
+                    }}
+                  />
+                  <span>{group.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </form>
       </Form>
       

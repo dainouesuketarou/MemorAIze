@@ -10,8 +10,10 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
+import { useSession } from 'next-auth/react';
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
   const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
@@ -20,6 +22,8 @@ export default function DashboardPage() {
   const [groupMode, setGroupMode] = useState<boolean>(false);
 
   useEffect(() => {
+    if (!session?.user?.id) return;
+
     // デッキ一覧取得（cards／groups がない場合は空配列で初期化）
     fetch('/api/decks')
       .then(res => res.json())
@@ -37,32 +41,35 @@ export default function DashboardPage() {
     fetch('/api/groups')
       .then(res => res.json())
       .then((data: Group[]) => {
-        setGroups([{ id: 'all', name: 'すべて' }, ...data]);
+        setGroups([  ...data]);
       })
       .catch(e => console.error('グループ取得エラー:', e));
-  }, []);
+  }, [session]);
 
   // グループ選択フィルタリング
   const filteredDecks = selectedGroup === 'all'
     ? decks
     : decks.filter(d => d.groups.some(g => g.id === selectedGroup));
 
-  // 新規グループ作成
   const handleAddGroup = async () => {
     if (!newGroupName.trim()) return;
+
     try {
       const res = await fetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newGroupName.trim() }),
+        body: JSON.stringify({ name: newGroupName }),
       });
-      if (!res.ok) throw new Error();
+
+      if (!res.ok) throw new Error('グループ作成失敗');
+
       const newGroup = await res.json();
       setGroups(prev => [...prev, newGroup]);
       setNewGroupName('');
       setShowGroupInput(false);
-    } catch {
-      alert('グループ作成に失敗しました');
+    } catch (e) {
+      console.error('グループ作成エラー:', e);
+      alert('グループの作成に失敗しました');
     }
   };
 
@@ -75,11 +82,11 @@ export default function DashboardPage() {
       setGroupMode={setGroupMode}
     >
       <DashboardHeader
-        heading="暗記カード帳"
-        description="AIで生成または手動で作成した暗記カード帳を管理します。"
+        heading="マイデッキ"
+        description="あなたの暗記カード帳一覧です。"
       >
         <Link href="/create">
-          <Button className="h-10">
+          <Button>
             <PlusCircle className="mr-2 h-4 w-4" />
             新規作成
           </Button>

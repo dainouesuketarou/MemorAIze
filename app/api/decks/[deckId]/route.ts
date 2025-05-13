@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getServerSession } from "next-auth";
 
 const prisma = new PrismaClient();
 
@@ -51,5 +53,39 @@ export async function GET(req: NextRequest, { params }: { params: { deckId: stri
     return NextResponse.json({ ...deck, stats, progressHistory });
   } catch (e) {
     return NextResponse.json({ error: 'DB取得エラー', detail: String(e) }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { deckId: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const deck = await prisma.deck.findUnique({
+      where: {
+        id: params.deckId,
+        userId: session.user.id,
+      },
+    });
+
+    if (!deck) {
+      return new NextResponse("Deck not found", { status: 404 });
+    }
+
+    await prisma.deck.delete({
+      where: {
+        id: params.deckId,
+      },
+    });
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error("[DECK_DELETE]", error);
+    return new NextResponse("Internal error", { status: 500 });
   }
 }

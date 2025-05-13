@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Star, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Deck, Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/types/deck';
 
 export default function StudyPage() {
   const { deckId } = useParams();
@@ -18,14 +19,19 @@ export default function StudyPage() {
   const [cards, setCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<(Deck & { groups: Group[] })[]>([]);
+  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [studyResults, setStudyResults] = useState<{ id: string, mastered: boolean }[]>([]);
 
   useEffect(() => {
     fetch('/api/groups').then(res => res.json()).then(setGroups);
-    fetch('/api/decks').then(res => res.json()).then(setDecks);
+    fetch('/api/decks').then(res => res.json()).then((data) => {
+      setDecks(data.map((deck: any) => ({
+        ...deck,
+        cards: deck.cards || []
+      })));
+    });
   }, []);
 
   useEffect(() => {
