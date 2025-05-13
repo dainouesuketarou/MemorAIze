@@ -6,7 +6,10 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "prisma": "^5.10.0"
+    "@types/node": "22.15.17",
+    "@types/react": "19.1.4",
+    "prisma": "^5.10.0",
+    "typescript": "5.8.3"
   },
   "scripts": {
     "dev": "next dev"
