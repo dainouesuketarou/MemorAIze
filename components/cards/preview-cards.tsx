@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Save, Edit2, Trash2, Volume2, Star, AlertCircle } from 'lucide-react';
+import { Save, Edit2, Trash2, Volume2, Star, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/components/ui/toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 interface PreviewCard {
   id: string;
@@ -17,27 +25,40 @@ interface PreviewCardsProps {
   cards: PreviewCard[];
   onSave: () => Promise<void>;
   isSaving: boolean;
+  onCardsChange: (cards: PreviewCard[]) => void;
+  onRegenerate?: (additionalInstructions: string) => Promise<PreviewCard[]>;
 }
 
-export function PreviewCards({ title, cards: initialCards, onSave, isSaving }: PreviewCardsProps) {
+export function PreviewCards({ title, cards: initialCards, onSave, isSaving, onRegenerate, onCardsChange }: PreviewCardsProps) {
   const [cards, setCards] = useState(initialCards);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editedCard, setEditedCard] = useState<PreviewCard | null>(null);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
+
+  useEffect(() => {
+    setCards(initialCards);
+  }, [initialCards]);
+
+  const commit = (next: PreviewCard[]) => {
+    setCards(next);
+    onCardsChange(next);
+  };
 
   const handleEdit = (card: PreviewCard) => {
     setEditingCardId(card.id);
     setEditedCard({ ...card });
   };
 
-  const handleDelete = (cardId: string) => {
-    setCards(cards.filter(card => card.id !== cardId));
+  const handleDelete = (id: string) => {
+    commit(cards.filter(c => c.id !== id));
   };
 
   const handleSaveEdit = () => {
     if (!editedCard) return;
-    setCards(cards.map(card => 
-      card.id === editedCard.id ? editedCard : card
-    ));
+    commit(cards.map(c => (c.id === editedCard.id ? editedCard : c)));
     setEditingCardId(null);
     setEditedCard(null);
   };
@@ -47,18 +68,47 @@ export function PreviewCards({ title, cards: initialCards, onSave, isSaving }: P
     setEditedCard(null);
   };
 
+  const handleRegenerate = async () => {
+    if (!onRegenerate) return;
+    setIsRegenerating(true);
+    try {
+      const regenerated = await onRegenerate(additionalInstructions);
+      commit(regenerated);
+      toast({ title: 'カードを再生成しました', description: 'AI によってカードが更新されました。' });
+      setDialogOpen(false);
+      setAdditionalInstructions('');
+    } catch (e) {
+      toast({ title: 'エラーが発生しました', variant: 'destructive' });
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <> 
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{title}</h2>
-        <Button 
-          onClick={onSave} 
-          disabled={isSaving}
-          className="flex items-center gap-2"
-        >
-          <Save className="h-4 w-4" />
-          {isSaving ? '保存中...' : '保存する'}
-        </Button>
+        <div className="flex gap-2">
+            {onRegenerate && (
+              <Button
+                variant="outline"
+                onClick={() => setDialogOpen(true)}  // ★ モーダルを開く
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                ブラッシュアップ
+              </Button>
+            )}
+          <Button 
+            onClick={onSave} 
+            disabled={isSaving}
+            className="flex items-center gap-2"
+          >
+            <Save className="h-4 w-4" />
+            {isSaving ? '保存中...' : '保存する'}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -140,5 +190,37 @@ export function PreviewCards({ title, cards: initialCards, onSave, isSaving }: P
         ))}
       </div>
     </div>
+
+<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+<DialogContent className="sm:max-w-lg">
+  <DialogHeader>
+    <DialogTitle>カードをブラッシュアップ</DialogTitle>
+  </DialogHeader>
+
+  <div className="space-y-4">
+    <label className="text-sm font-medium">追加指示</label>
+    <Textarea
+      value={additionalInstructions}
+      onChange={(e) => setAdditionalInstructions(e.target.value)}
+      placeholder="例）「より簡潔に」「例文を追加して」など"
+      className="min-h-[100px]"
+    />
+  </div>
+
+  <DialogFooter>
+    <Button
+      onClick={handleRegenerate}
+      disabled={isRegenerating}
+      className="flex items-center gap-2"
+    >
+      {isRegenerating && (
+        <RefreshCw className={cn('h-4 w-4 animate-spin')} />
+      )}
+      {isRegenerating ? '再生成中...' : '再生成'}
+    </Button>
+  </DialogFooter>
+</DialogContent>
+</Dialog>
+    </>
   );
 } 

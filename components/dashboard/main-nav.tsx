@@ -57,7 +57,7 @@ export function MainNav({
           <GroupIcon className="mr-2 h-4 w-4" />
           {groupMode ? 'グループ化モード解除' : 'グループ化'}
         </Button>
-        <Link href="/dashboard/review">
+        {/* <Link href="/dashboard/review">
           <Button
             variant="ghost"
             className={cn(
@@ -68,7 +68,7 @@ export function MainNav({
             <Repeat className="mr-2 h-4 w-4" />
             復習計画
           </Button>
-        </Link>
+        </Link> */}
       </nav>
     </div>
   );

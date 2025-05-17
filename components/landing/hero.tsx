@@ -1,9 +1,24 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { BrainCircuit } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export function LandingHero() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
+  const handleStart = () => {
+    if (status === 'authenticated') {
+      router.push('/dashboard');
+    } else {
+      router.push('/login');
+    }
+  };
+
   return (
     <div className="bg-gradient-to-b from-muted/50 to-muted pb-16 pt-10">
       <div className="container px-4 md:px-6">
@@ -13,9 +28,11 @@ export function LandingHero() {
             <h1 className="text-2xl font-bold">MemorAIze</h1>
           </div>
           <div>
-            <Link href="/login">
-              <Button>ログイン / 登録</Button>
-            </Link>
+            {status !== 'authenticated' && (
+              <Link href="/login">
+                <Button>ログイン / 登録</Button>
+              </Link>
+            )}
           </div>
         </div>
         
@@ -32,11 +49,9 @@ export function LandingHero() {
               </p>
             </div>
             <div className="flex flex-col gap-2 min-[400px]:flex-row">
-              <Link href="/login" className="w-full md:w-auto">
-                <Button size="lg" className="w-full">
-                  はじめる
-                </Button>
-              </Link>
+              <Button size="lg" className="w-full md:w-auto" onClick={handleStart}>
+                はじめる
+              </Button>
               <Link href="#features" className="w-full md:w-auto">
                 <Button size="lg" variant="outline" className="w-full">
                   機能を見る
