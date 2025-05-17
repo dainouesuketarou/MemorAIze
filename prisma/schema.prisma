@@ -102,3 +102,14 @@ model VerificationToken {
 
     @@unique([identifier, token])
 }
+
+model AiGenerationLimit {
+    id        String   @id @default(cuid())
+    userId    String
+    month     DateTime
+    count     Int      @default(0)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([userId, month])
+}

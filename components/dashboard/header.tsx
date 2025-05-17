@@ -1,6 +1,13 @@
+import { Edit2 } from "lucide-react";
+import { Button } from "../ui/button";
+import { useState } from "react";
+import { Dialog, DialogContent } from "@radix-ui/react-dialog";
+import { DialogHeader, DialogTitle } from "../ui/dialog";
+import { DeckEditForm } from "../decks/deck-edit-form";
+
 interface DashboardHeaderProps {
-  heading: string;
-  description?: string;
+  heading: React.ReactNode;
+  description?: React.ReactNode;
   children?: React.ReactNode;
 }
 

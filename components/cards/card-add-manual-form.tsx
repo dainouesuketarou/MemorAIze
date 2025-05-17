@@ -47,7 +47,9 @@ export function CardAddManualForm({ deckId, onSuccess }: Props) {
           onChange={e => setFront(e.target.value)}
           placeholder="例）Memorize"
           className="min-h-[60px]"
+          maxLength={100}
         />
+        <p className="text-sm text-muted-foreground mt-1">100文字以内で入力してください</p>
       </div>
       <div>
         <label className="block mb-1 font-medium">裏面</label>
@@ -56,7 +58,9 @@ export function CardAddManualForm({ deckId, onSuccess }: Props) {
           onChange={e => setBack(e.target.value)}
           placeholder="例）記憶する、暗記する"
           className="min-h-[60px]"
+          maxLength={100}
         />
+        <p className="text-sm text-muted-foreground mt-1">100文字以内で入力してください</p>
       </div>
       <Button type="submit" className="w-full" disabled={isLoading || !front || !back}>
         {isLoading ? (<><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />追加中...</>) : 'カードを追加'}
