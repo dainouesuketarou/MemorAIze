@@ -29,10 +29,9 @@ export async function POST(req: NextRequest, { params }: { params: { deckId: str
     });
 
     if (deck) {
-      // 学習済みカード（UNLEARNED以外）のみをカウント
-      const learnedCards = deck.cards.filter(card => card.status !== 'UNLEARNED');
-      const masteredCount = learnedCards.filter(card => card.status === 'MASTERED').length;
-      const progress = learnedCards.length > 0 ? masteredCount / learnedCards.length : 0;
+      const totalCards = deck.cards.length;
+      const masteredCount = deck.cards.filter(card => card.status === 'MASTERED').length;
+      const progress = totalCards > 0 ? masteredCount / totalCards : 0;
 
       await prisma.deck.update({
         where: { id: params.deckId },

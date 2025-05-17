@@ -35,11 +35,18 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // Simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      router.push('/dashboard');
+      const result = await signIn('email', {
+        email: values.email,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      router.push(`/auth/email-sent?email=${encodeURIComponent(values.email)}`);
     } catch (error) {
-      toast.error('エラーが発生しました');
+      toast.error(error instanceof Error ? error.message : 'エラーが発生しました');
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +55,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      await signIn('google');
+      await signIn('google', { callbackUrl: '/dashboard' });
     } catch (error) {
       toast.error('エラーが発生しました');
     } finally {
@@ -109,7 +116,7 @@ export default function LoginPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "送信中..." : "メールリンクを送信"}
+                  {isLoading ? "送信中..." : "メールアドレスで続ける"}
                 </Button>
               </form>
             </Form>

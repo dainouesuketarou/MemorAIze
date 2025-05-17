@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,44 +18,39 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { 
-  RadioGroup, 
-  RadioGroupItem 
+  RadioGroup,
+  RadioGroupItem,
 } from '@/components/ui/radio-group';
 import { LoaderCircle, MinusCircle, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { GeneratingCards } from './generating-cards';
 import { PreviewCards } from './preview-cards';
+import { toast } from '@/components/ui/toast';
 
+/* ----------------------------- 型定義 ----------------------------- */
+export interface PreviewCard {
+  id: string;
+  front: string;
+  back: string;
+}
+
+/* ----------------------------- Zod スキーマ ----------------------------- */
 const formSchema = z.object({
-  title: z.string().min(2, {
-    message: '暗記カード帳のタイトルを入力してください。',
-  }),
+  title: z.string().min(2, { message: '暗記カード帳のタイトルを入力してください。' }),
   content: z.string().optional(),
-  fileUpload: z.any().optional(),
   cardFormat: z.enum(['term-meaning', 'question-answer', 'custom']),
   cardCount: z.number().min(1).max(100),
   additionalInstructions: z.string().optional(),
 });
 
+/* ===================================================================== */
+/*                                親コンポーネント                       */
+/* ===================================================================== */
 export function AiGenerateForm() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [generatedCards, setGeneratedCards] = useState<{
-    title: string;
-    cards: Array<{ id: string; front: string; back: string; }>;
-  } | null>(null);
-  
+
+  /* ------- フォーム関連 ------- */
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -66,128 +62,118 @@ export function AiGenerateForm() {
     },
   });
 
+  /* ------- 画面状態 ------- */
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /* ------- AI 生成結果を保持 ------- */
+  const [title, setTitle]       = useState('');               // デッキ名
+  const [cards, setCards]       = useState<PreviewCard[]>([]); // 常に最新のカード配列
+  const [lastPayload, setLastPayload] = useState<any | null>(null); // 再生成用
+
+  /* ------------------------------ 送信ハンドラ ----------------------------- */
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      if (!values.content && uploadedFiles.length === 0) {
-        throw new Error('テキスト入力またはファイルアップロードが必要です');
-      }
-
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...values,
-          uploadedFiles: uploadedFiles.map(file => ({
-            name: file.name,
-            type: file.type,
-            size: file.size,
-          })),
-        }),
+      /* ---------- API へ投げるペイロードを作成 ---------- */
+      const payload = { ...values };        // ここではファイル/OCR 処理を省略
+      const res = await fetch('/api/generate', {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify(payload),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '暗記カードの生成に失敗しました');
+      const json = await res.json();
+      if (!res.ok || !json.data?.cards?.length) {
+        throw new Error(json.error || '暗記カードの生成に失敗しました');
       }
 
-      if (!data.data?.cards?.length) {
-        throw new Error('カードの生成に失敗しました');
-      }
-
-      setGeneratedCards(data.data);
-    } catch (error) {
-      console.error('Error generating cards:', error);
-      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました');
+      /* ---------- 正常時: state 更新 ---------- */
+      setTitle(json.data.title);
+      setCards(json.data.cards);
+      setLastPayload(payload);
+      toast({ title: '暗記カードを生成しました', description: 'プレビュー画面で編集できます。' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '予期せぬエラーが発生しました';
+      setError(msg);
+      toast({ title: 'エラーが発生しました', description: msg, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   }
 
+  /* ------------------------------ 保存ハンドラ ----------------------------- */
   const handleSave = async () => {
-    if (!generatedCards) return;
-
+    if (!cards.length) return;
     setIsSaving(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/decks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: generatedCards.title,
-          cards: generatedCards.cards.map(card => ({
-            front: card.front,
-            back: card.back,
-          })),
+      const res = await fetch('/api/decks', {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({
+          title,
+          cards: cards.map(({ front, back }) => ({ front, back })),
         }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'デッキの保存に失敗しました');
-      }
-
-      if (!data.success) {
-        throw new Error('デッキの保存に失敗しました');
-      }
-
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'デッキの保存に失敗しました');
       router.push('/dashboard');
-    } catch (error) {
-      console.error('Error saving deck:', error);
-      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '予期せぬエラーが発生しました';
+      setError(msg);
+      toast({ title: 'エラーが発生しました', description: msg, variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      setUploadedFiles(prev => [...prev, ...Array.from(files)]);
-    }
-  };
+  /* ------------------------------ 再生成ハンドラ ----------------------------- */
+  async function regenerateCards(additional: string): Promise<PreviewCard[]> {
+    if (!lastPayload) throw new Error('初回生成情報がありません');
+    const payload = { ...lastPayload, additionalInstructions: additional, cardCount: cards.length };
 
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-  };
+    const res   = await fetch('/api/generate', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify(payload),
+    });
+    const json  = await res.json();
+    if (!res.ok || !json.data?.cards?.length) throw new Error(json.error || '再生成に失敗しました');
 
-  const increaseCardCount = () => {
-    const currentCount = form.getValues('cardCount');
-    form.setValue('cardCount', Math.min(currentCount + 5, 100));
-  };
+    /* 親 state 更新 → 子にも自動反映 */
+    setCards(json.data.cards);
+    return json.data.cards;
+  }
 
-  const decreaseCardCount = () => {
-    const currentCount = form.getValues('cardCount');
-    form.setValue('cardCount', Math.max(currentCount - 5, 1));
-  };
-
+  /* ------------------------------ JSX ----------------------------- */
   return (
     <Form {...form}>
       {isLoading ? (
         <GeneratingCards />
-      ) : generatedCards ? (
+      ) : cards.length ? (
         <PreviewCards
-          title={generatedCards.title}
-          cards={generatedCards.cards}
+          title={title}
+          cards={cards}
           onSave={handleSave}
           isSaving={isSaving}
+          onCardsChange={setCards}        /* ← 編集・削除・追加を受け取る */
+          onRegenerate={regenerateCards}  /* ← 追加指示で再生成 */
         />
       ) : (
+        /* ---------- 最初の入力フォーム ---------- */
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* エラー表示 */}
           {error && (
             <div className="p-4 bg-destructive/10 text-destructive rounded-md">
               <p className="text-sm font-medium">{error}</p>
             </div>
           )}
+
+          {/* -- タイトル -- */}
           <FormField
             control={form.control}
             name="title"
@@ -201,83 +187,28 @@ export function AiGenerateForm() {
               </FormItem>
             )}
           />
-          
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium mb-2">学習内容</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                テキスト入力、またはファイルアップロードから暗記カードを生成します。
-              </p>
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>テキスト入力</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="例）「英検準一級英単語」、「生物学基礎の定期試験対策」など" 
-                      className="min-h-[120px]" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    学習したい内容のテキストを入力してください。
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="space-y-2">
-              <FormLabel>ファイルアップロード</FormLabel>
-              <div className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-                   onClick={() => document.getElementById('file-upload')?.click()}>
-                <Input
-                  id="file-upload"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  multiple
-                />
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">
-                    クリックしてファイルを選択、または
-                    <br />
-                    ファイルをドラッグ＆ドロップ
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    PDF, JPG, PNGがサポートされています (最大1MB)
-                  </div>
-                </div>
-              </div>
-              
-              {uploadedFiles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium">アップロードされたファイル:</p>
-                  <ul className="space-y-2">
-                    {uploadedFiles.map((file, index) => (
-                      <li key={index} className="flex items-center justify-between bg-muted p-2 rounded-md text-sm">
-                        <span className="truncate max-w-xs">{file.name}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFile(index)}
-                        >
-                          <MinusCircle className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-          
+
+          {/* -- 学習内容テキスト -- */}
+          <FormField
+            control={form.control}
+            name="content"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>学習内容テキスト</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="例）「英検準一級英単語」「生物学基礎の定期試験対策」など"
+                    className="min-h-[120px]"
+                    {...field}
+                  />
+                </FormControl>
+                <FormDescription>学習したい内容を入力してください。</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* -- カード形式 -- */}
           <FormField
             control={form.control}
             name="cardFormat"
@@ -291,28 +222,16 @@ export function AiGenerateForm() {
                     className="flex flex-col space-y-1"
                   >
                     <FormItem className="flex items-center space-x-3 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="term-meaning" />
-                      </FormControl>
-                      <FormLabel className="font-normal">
-                        表: 単語、裏: 意味
-                      </FormLabel>
+                      <FormControl><RadioGroupItem value="term-meaning" /></FormControl>
+                      <FormLabel className="font-normal">表: 単語 / 裏: 意味</FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-3 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="question-answer" />
-                      </FormControl>
-                      <FormLabel className="font-normal">
-                        表: 問題、裏: 答え
-                      </FormLabel>
+                      <FormControl><RadioGroupItem value="question-answer" /></FormControl>
+                      <FormLabel className="font-normal">表: 問題 / 裏: 答え</FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-3 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="custom" />
-                      </FormControl>
-                      <FormLabel className="font-normal">
-                        カスタム (追加指示で詳細を指定)
-                      </FormLabel>
+                      <FormControl><RadioGroupItem value="custom" /></FormControl>
+                      <FormLabel className="font-normal">カスタム</FormLabel>
                     </FormItem>
                   </RadioGroup>
                 </FormControl>
@@ -320,19 +239,20 @@ export function AiGenerateForm() {
               </FormItem>
             )}
           />
-          
+
+          {/* -- カード枚数 -- */}
           <FormField
             control={form.control}
             name="cardCount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>カード枚数 (1-100)</FormLabel>
+                <FormLabel>カード枚数 (1–100)</FormLabel>
                 <div className="flex items-center space-x-4">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={decreaseCardCount}
+                    onClick={() => field.onChange(Math.max(field.value - 5, 1))}
                     disabled={field.value <= 1}
                     className="h-8 w-8"
                   >
@@ -344,7 +264,7 @@ export function AiGenerateForm() {
                       min={1}
                       max={100}
                       className="w-20 text-center"
-                      {...field}
+                      value={field.value}
                       onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
                     />
                   </FormControl>
@@ -352,7 +272,7 @@ export function AiGenerateForm() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={increaseCardCount}
+                    onClick={() => field.onChange(Math.min(field.value + 5, 100))}
                     disabled={field.value >= 100}
                     className="h-8 w-8"
                   >
@@ -364,7 +284,8 @@ export function AiGenerateForm() {
               </FormItem>
             )}
           />
-          
+
+          {/* -- 追加指示 -- */}
           <FormField
             control={form.control}
             name="additionalInstructions"
@@ -373,24 +294,19 @@ export function AiGenerateForm() {
                 <FormLabel>追加指示 (オプション)</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="例）「表をフランス語、裏を日本語にしてください」「計算問題を中心に問題作成してください」など"
+                    placeholder="例）「表をフランス語、裏を日本語にしてください」など"
                     className="min-h-[80px]"
                     {...field}
                   />
                 </FormControl>
-                <FormDescription>
-                  特別な要望や指示があれば入力してください。
-                </FormDescription>
+                <FormDescription>特別な要望や指示があれば入力してください。</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-          
-          <Button 
-            type="submit" 
-            className="w-full" 
-            disabled={isLoading}
-          >
+
+          {/* -- 送信ボタン -- */}
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
                 <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />

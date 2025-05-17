@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
           front,
           back,
           status: 'UNLEARNED', // 新規カードは未学習状態
+          order: 0, // 新規カードは最後に追加
         },
       });
 
