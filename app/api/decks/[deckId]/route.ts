@@ -8,22 +8,45 @@ const prisma = new PrismaClient();
 export async function PATCH(req: NextRequest, { params }: { params: { deckId: string } }) {
   const deckId = params.deckId;
   const data = await req.json();
-  const { groupIds } = data; // 新しいグループID配列
+  const { groupIds, title, description } = data; // 新しいグループID配列
 
-  try {
-    const updated = await prisma.deck.update({
-      where: { id: deckId },
-      data: {
-        groups: {
-          set: groupIds.map((id: string) => ({ id }))
-        }
-      },
-      include: { groups: true }
-    });
-    return NextResponse.json(updated);
-  } catch (e) {
-    return NextResponse.json({ error: 'グループ更新エラー', detail: String(e) }, { status: 500 });
+  if (title) {
+    try {
+      const updated = await prisma.deck.update({
+        where: { id: deckId },
+        data: { title },
+      });
+    } catch (e) { 
+      return NextResponse.json({ error: 'タイトル更新エラー', detail: String(e) }, { status: 500 });
+    }
   }
+  if (description) {
+    try {
+      const updated = await prisma.deck.update({
+        where: { id: deckId },
+        data: { description },
+      });
+    } catch (e) {
+      return NextResponse.json({ error: '説明更新エラー', detail: String(e) }, { status: 500 });
+    }
+  }
+  if (groupIds) {
+    try {
+      const updated = await prisma.deck.update({
+        where: { id: deckId },
+        data: {
+          groups: {
+            set: groupIds.map((id: string) => ({ id }))
+          }
+        },
+        include: { groups: true }
+      });
+      return NextResponse.json({ success: true, updated });
+    } catch (e) {
+      return NextResponse.json({ error: 'グループ更新エラー', detail: String(e) }, { status: 500 });
+    }
+  }
+  return NextResponse.json({ success: true });
 }
 
 export async function GET(req: NextRequest, { params }: { params: { deckId: string } }) {

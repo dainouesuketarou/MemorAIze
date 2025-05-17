@@ -6,7 +6,7 @@ import { DashboardHeader } from '@/components/dashboard/header';
 import { DashboardShell } from '@/components/dashboard/shell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Book, Home, Plus, Trash2, Edit2, Volume2, Star, AlertCircle } from 'lucide-react';
+import { Book, Home, Plus, Trash2, Edit2, Volume2, Star, AlertCircle, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Deck, Group } from '@prisma/client';
@@ -15,6 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CardAddAiForm } from '@/components/cards/card-add-ai-form';
 import { CardAddManualForm } from '@/components/cards/card-add-manual-form';
+import { CardEditForm } from '@/components/cards/card-edit-form';
+import { DeckEditForm } from '@/components/decks/deck-edit-form';
+import { toast } from 'sonner';
 
 export default function CardsPage() {
   const router = useRouter();
@@ -28,6 +31,9 @@ export default function CardsPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [tab, setTab] = useState<'ai'|'manual'>('ai');
+  const [editingCard, setEditingCard] = useState<any>(null);
+  const [deckEditModalOpen, setDeckEditModalOpen] = useState(false);
+  const [currentDeck, setCurrentDeck] = useState<any>(null);
 
   useEffect(() => {
     fetch('/api/groups').then(res => res.json()).then(setGroups);
@@ -77,6 +83,45 @@ export default function CardsPage() {
     setModalOpen(false);
   };
 
+  const handleCardDelete = async (cardId: string) => {
+    if (!confirm('このカードを削除してもよろしいですか？')) return;
+
+    try {
+      const response = await fetch(`/api/cards/${cardId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('カードの削除に失敗しました');
+      }
+
+      toast.success('カードを削除しました');
+      handleCardAddSuccess();
+    } catch (error) {
+      toast.error('エラーが発生しました');
+      console.error(error);
+    }
+  };
+
+  const handleCardEdit = (card: any) => {
+    setEditingCard(card);
+  };
+
+  const handleCardEditSuccess = () => {
+    setEditingCard(null);
+    handleCardAddSuccess();
+  };
+
+  const handleDeckEditSuccess = async () => {
+    setDeckEditModalOpen(false);
+    if (!deckId) return;
+    const res = await fetch(`/api/decks/${deckId}`);
+    if (res.ok) {
+      const deck = await res.json();
+      setCurrentDeck(deck);
+    }
+  };
+
   return (
     <DashboardShell
       groups={groups}
@@ -86,8 +131,16 @@ export default function CardsPage() {
       setGroupMode={setGroupMode}
     >
       <DashboardHeader
-        heading="カード一覧"
-        description="暗記カードの管理と編集を行います"
+        heading={
+          <div className="flex items-center gap-2">
+            <span>カード一覧</span>
+          </div>
+        }
+        description={
+          <div className="flex items-center gap-2">
+            <span>暗記カードの管理と編集を行います</span>
+          </div>
+        }
       >
         <div className="flex gap-2">
           <Link href="/dashboard">
@@ -124,10 +177,20 @@ export default function CardsPage() {
                     <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10">
                       <Volume2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 hover:bg-primary/10"
+                      onClick={() => handleCardEdit(card)}
+                    >
                       <Edit2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 hover:bg-destructive/10"
+                      onClick={() => handleCardDelete(card.id)}
+                    >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -181,8 +244,10 @@ export default function CardsPage() {
           </div>
         )}
       </div>
+
+      {/* カード追加モーダル */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>新しいカードを追加</DialogTitle>
           </DialogHeader>
@@ -201,6 +266,41 @@ export default function CardsPage() {
           <DialogClose asChild>
             <Button variant="outline" className="w-full mt-4">閉じる</Button>
           </DialogClose>
+        </DialogContent>
+      </Dialog>
+
+      {/* カード編集モーダル */}
+      <Dialog open={!!editingCard} onOpenChange={() => setEditingCard(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>カードを編集</DialogTitle>
+          </DialogHeader>
+          {editingCard && (
+            <CardEditForm
+              cardId={editingCard.id}
+              initialFront={editingCard.front}
+              initialBack={editingCard.back}
+              onSuccess={handleCardEditSuccess}
+              onCancel={() => setEditingCard(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* デッキ編集モーダル */}
+      <Dialog open={deckEditModalOpen} onOpenChange={setDeckEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>デッキ設定</DialogTitle>
+          </DialogHeader>
+          {currentDeck && (
+            <DeckEditForm
+              deckId={deckId as string}
+              initialTitle={currentDeck.title}
+              initialDescription={currentDeck.description}
+              onSuccess={handleDeckEditSuccess}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </DashboardShell>

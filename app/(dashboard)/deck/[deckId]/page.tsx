@@ -12,6 +12,14 @@ import { PieChart, Pie, Cell, LineChart as RechartsLineChart, Line, XAxis, YAxis
 import { Deck, Group } from '@prisma/client';
 import { DeckWithCardsAndGroups } from '@/types/deck';
 import { Loading } from '@/components/loading';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { DeckEditForm } from '@/components/decks/deck-edit-form';
+import { Edit2 } from 'lucide-react';
 
 
 // 相対時間を計算する関数
@@ -45,6 +53,7 @@ export default function DeckDetailsPage() {
   const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [deckData, setDeckData] = useState<any>(null);
+  const [editOpen, setEditOpen]   = useState(false);
   // 進捗表示モードを2つに分ける
   const [pieProgressMode, setPieProgressMode] = useState<'all'|'learned'>('all');
   const [chartProgressMode, setChartProgressMode] = useState<'all'|'learned'>('all');
@@ -188,7 +197,19 @@ export default function DeckDetailsPage() {
       setGroupMode={setGroupMode}
     >
       <DashboardHeader
-        heading={deckData.title}
+        heading={
+          <span className="flex items-center">
+            {deckData.title}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-1 h-8 w-8"
+              onClick={() => setEditOpen(true)}
+            >
+              <Edit2 className="h-4 w-4" />
+            </Button>
+          </span>
+        }
         description={deckData.description}
       >
         <Link href="/dashboard">
@@ -352,6 +373,28 @@ export default function DeckDetailsPage() {
           </Link>
         </div>
       </div>
+
+      {/* ---------- デッキ編集モーダル ---------- */}
+<Dialog open={editOpen} onOpenChange={setEditOpen}>
+  <DialogContent className="max-w-lg">
+    <DialogHeader>
+      <DialogTitle>デッキ設定</DialogTitle>
+    </DialogHeader>
+
+    <DeckEditForm
+      deckId={deckId as string}
+      initialTitle={deckData.title}
+      initialDescription={deckData.description}
+      onSuccess={async () => {
+        setEditOpen(false);
+        // 更新後に再フェッチ
+        const res = await fetch(`/api/decks/${deckId}`);
+        if (res.ok) setDeckData(await res.json());
+      }}
+    />
+  </DialogContent>
+</Dialog>
+
     </DashboardShell>
   );
 }

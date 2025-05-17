@@ -37,11 +37,11 @@ export interface PreviewCard {
 
 /* ----------------------------- Zod スキーマ ----------------------------- */
 const formSchema = z.object({
-  title: z.string().min(2, { message: '暗記カード帳のタイトルを入力してください。' }),
-  content: z.string().optional(),
-  cardFormat: z.enum(['term-meaning', 'question-answer', 'custom']),
-  cardCount: z.number().min(1).max(100),
-  additionalInstructions: z.string().optional(),
+  title: z.string().max(50, { message: 'タイトルは50文字以内で入力してください。' }).optional(),
+  content: z.string().max(1000, { message: '学習内容は1000文字以内で入力してください。' }).optional(),
+  cardFormat: z.enum(['term-meaning', 'question-answer', 'auto']),
+  cardCount: z.number().min(1).max(30),
+  additionalInstructions: z.string().max(500, { message: '追加指示は500文字以内で入力してください。' }).optional(),
 });
 
 /* ===================================================================== */
@@ -49,6 +49,7 @@ const formSchema = z.object({
 /* ===================================================================== */
 export function AiGenerateForm() {
   const router = useRouter();
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   /* ------- フォーム関連 ------- */
   const form = useForm<z.infer<typeof formSchema>>({
@@ -56,7 +57,7 @@ export function AiGenerateForm() {
     defaultValues: {
       title: '',
       content: '',
-      cardFormat: 'term-meaning',
+      cardFormat: 'auto',
       cardCount: 10,
       additionalInstructions: '',
     },
@@ -78,12 +79,37 @@ export function AiGenerateForm() {
     setError(null);
 
     try {
+      if (!values.title && !values.content && uploadedFiles.length === 0) {
+        throw new Error('タイトル、学習内容テキスト、またはファイルアップロードのいずれかを入力してください');
+      }
+
       /* ---------- API へ投げるペイロードを作成 ---------- */
-      const payload = { ...values };        // ここではファイル/OCR 処理を省略
+      const payload = { ...values };
+      
+      // ファイルがアップロードされている場合、OCR処理を実行
+      if (uploadedFiles.length > 0) {
+        const file = uploadedFiles[0];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const uploadData = await uploadResponse.json();
+
+        if (!uploadResponse.ok || !uploadData.success) {
+          throw new Error(uploadData.error || 'ファイルの処理に失敗しました');
+        }
+
+        payload.content = uploadData.data.text;
+      }
+
       const res = await fetch('/api/generate', {
-        method : 'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body   : JSON.stringify(payload),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok || !json.data?.cards?.length) {
@@ -149,6 +175,41 @@ export function AiGenerateForm() {
     return json.data.cards;
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (file.size > 1024 * 1024) { // 1MB
+      toast({
+        title: "エラー",
+        description: "ファイルサイズは1MB以下にしてください。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadedFiles([file]);
+    toast({
+      title: "ファイルがアップロードされました",
+      description: "フォームに必要事項を入力し、「暗記カードを生成」ボタンを押してください。",
+    });
+  };
+
+  const removeFile = () => {
+    setUploadedFiles([]);
+  };
+
+  const increaseCardCount = () => {
+    const currentCount = form.getValues('cardCount');
+    form.setValue('cardCount', Math.min(currentCount + 5, 30));
+  };
+
+  const decreaseCardCount = () => {
+    const currentCount = form.getValues('cardCount');
+    form.setValue('cardCount', Math.max(currentCount - 5, 1));
+  };
+
   /* ------------------------------ JSX ----------------------------- */
   return (
     <Form {...form}>
@@ -173,20 +234,78 @@ export function AiGenerateForm() {
             </div>
           )}
 
+          <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+            <p className="text-sm font-medium">以下のいずれかを入力してください：</p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+              <li>暗記カード帳のタイトル</li>
+              <li>学習内容テキスト</li>
+              <li>ファイルアップロード</li>
+            </ul>
+            <p className="text-sm text-muted-foreground mt-2">
+              タイトルのみを入力した場合、AIがタイトルから内容を推測してカードを生成します。
+            </p>
+          </div>
+
           {/* -- タイトル -- */}
           <FormField
             control={form.control}
             name="title"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>暗記カード帳のタイトル</FormLabel>
+                <FormLabel>暗記カード帳のタイトル<span className="text-destructive">*</span></FormLabel>
                 <FormControl>
-                  <Input placeholder="例）英検準一級英単語" {...field} />
+                  <Input placeholder="例）英検準一級英単語" maxLength={50} {...field} />
                 </FormControl>
+                <FormDescription>50文字以内で入力してください。未入力の場合はAIが生成します。</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          {/* -- ファイルアップロード -- */}
+          <div className="space-y-2">
+            <FormLabel className="flex items-center gap-1">
+              ファイルアップロード
+              <span className="text-destructive">*</span>
+            </FormLabel>
+            <div className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                 onClick={() => document.getElementById('file-upload')?.click()}>
+              <Input
+                id="file-upload"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">
+                  クリックしてファイルを選択、または
+                  <br />
+                  ファイルをドラッグ＆ドロップ
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  PDF, JPG, PNGがサポートされています (最大1MB)
+                </div>
+              </div>
+            </div>
+            
+            {uploadedFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium">アップロードされたファイル:</p>
+                <div className="flex items-center justify-between bg-muted p-2 rounded-md text-sm">
+                  <span className="truncate max-w-xs">{uploadedFiles[0].name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeFile}
+                  >
+                    <MinusCircle className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* -- 学習内容テキスト -- */}
           <FormField
@@ -194,15 +313,16 @@ export function AiGenerateForm() {
             name="content"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>学習内容テキスト</FormLabel>
+                <FormLabel>学習内容テキスト<span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="例）「英検準一級英単語」「生物学基礎の定期試験対策」など"
+                    placeholder="ここに暗記カードとして作成したい学習ドキュメントをコピー＆ペーストしてください。例）「英検準一級の単語リスト」「生物学の教科書の該当ページ」など"
                     className="min-h-[120px]"
+                    maxLength={1000}
                     {...field}
                   />
                 </FormControl>
-                <FormDescription>学習したい内容を入力してください。</FormDescription>
+                <FormDescription>1000文字以内で入力してください</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -222,16 +342,17 @@ export function AiGenerateForm() {
                     className="flex flex-col space-y-1"
                   >
                     <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl><RadioGroupItem value="auto" /></FormControl>
+                      <FormLabel className="font-normal">オート（AIが最適な形式を選択）</FormLabel>
+                    </FormItem>
+                    <FormDescription>オートを選択すると、AIが内容に応じて最適な形式を選択します</FormDescription>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
                       <FormControl><RadioGroupItem value="term-meaning" /></FormControl>
                       <FormLabel className="font-normal">表: 単語 / 裏: 意味</FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-3 space-y-0">
                       <FormControl><RadioGroupItem value="question-answer" /></FormControl>
                       <FormLabel className="font-normal">表: 問題 / 裏: 答え</FormLabel>
-                    </FormItem>
-                    <FormItem className="flex items-center space-x-3 space-y-0">
-                      <FormControl><RadioGroupItem value="custom" /></FormControl>
-                      <FormLabel className="font-normal">カスタム</FormLabel>
                     </FormItem>
                   </RadioGroup>
                 </FormControl>
@@ -246,13 +367,13 @@ export function AiGenerateForm() {
             name="cardCount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>カード枚数 (1–100)</FormLabel>
+                <FormLabel>カード枚数 (1–30)</FormLabel>
                 <div className="flex items-center space-x-4">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => field.onChange(Math.max(field.value - 5, 1))}
+                    onClick={decreaseCardCount}
                     disabled={field.value <= 1}
                     className="h-8 w-8"
                   >
@@ -262,7 +383,7 @@ export function AiGenerateForm() {
                     <Input
                       type="number"
                       min={1}
-                      max={100}
+                      max={30}
                       className="w-20 text-center"
                       value={field.value}
                       onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
@@ -272,14 +393,15 @@ export function AiGenerateForm() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => field.onChange(Math.min(field.value + 5, 100))}
-                    disabled={field.value >= 100}
+                    onClick={increaseCardCount}
+                    disabled={field.value >= 30}
                     className="h-8 w-8"
                   >
                     <PlusCircle className="h-4 w-4" />
                   </Button>
                   <span className="text-sm text-muted-foreground">枚</span>
                 </div>
+                <FormDescription>AIによる生成は最大30枚までです</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -296,10 +418,11 @@ export function AiGenerateForm() {
                   <Textarea
                     placeholder="例）「表をフランス語、裏を日本語にしてください」など"
                     className="min-h-[80px]"
+                    maxLength={500}
                     {...field}
                   />
                 </FormControl>
-                <FormDescription>特別な要望や指示があれば入力してください。</FormDescription>
+                <FormDescription>500文字以内で入力してください</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

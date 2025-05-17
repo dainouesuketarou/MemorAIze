@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import OpenAI from 'openai';
+import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+const prisma = new PrismaClient();
+const MONTHLY_LIMIT = 5;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,7 +15,7 @@ const openai = new OpenAI({
 const generateSchema = z.object({
   title: z.string().min(2),
   content: z.string().optional(),
-  cardFormat: z.enum(['term-meaning', 'question-answer', 'custom']),
+  cardFormat: z.enum(['term-meaning', 'question-answer', 'custom', 'auto']),
   cardCount: z.number().min(1).max(100),
   additionalInstructions: z.string().optional(),
 });
@@ -19,6 +25,7 @@ function generatePrompt(data: z.infer<typeof generateSchema>) {
     'term-meaning': '表に単語や用語、裏にその意味や説明を記載してください。',
     'question-answer': '表に問題、裏にその答えを記載してください。',
     'custom': data.additionalInstructions || '表裏の内容を自由に設定してください。',
+    'auto': '内容に応じて最適な形式（単語/意味 または 問題/答え）を選択してください。',
   };
 
   return `
@@ -45,6 +52,41 @@ ${data.additionalInstructions ? `追加指示: ${data.additionalInstructions}` :
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 });
+    }
+
+    // 日本時間での月の開始日を計算
+    const now = new Date();
+    const jstOffset = 9 * 60; // 日本時間のオフセット（分）
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const jst = new Date(utc + (jstOffset * 60000));
+    const startOfMonth = new Date(jst.getFullYear(), jst.getMonth(), 1);
+
+    // 月間生成回数をチェック
+    const generationLimit = await prisma.aiGenerationLimit.upsert({
+      where: {
+        userId_month: {
+          userId: session.user.id,
+          month: startOfMonth,
+        },
+      },
+      update: {},
+      create: {
+        userId: session.user.id,
+        month: startOfMonth,
+        count: 0,
+      },
+    });
+
+    if (generationLimit.count >= MONTHLY_LIMIT) {
+      return NextResponse.json({
+        success: false,
+        error: '今月のAI生成回数の上限に達しました。来月までお待ちください。',
+      }, { status: 429 });
+    }
+
     const body = await req.json();
     const validatedData = generateSchema.parse(body);
 
@@ -81,6 +123,18 @@ export async function POST(req: Request) {
         console.error('Error parsing AI response:', error);
         throw new Error('AIの応答の解析に失敗しました');
       }
+
+      // 生成回数を更新
+      await prisma.aiGenerationLimit.update({
+        where: {
+          id: generationLimit.id,
+        },
+        data: {
+          count: {
+            increment: 1,
+          },
+        },
+      });
 
       return NextResponse.json({
         success: true,

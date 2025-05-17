@@ -26,14 +26,20 @@ import { Group } from '@prisma/client';
 const deckFormSchema = z.object({
   title: z.string().min(2, {
     message: '暗記カード帳のタイトルを入力してください。',
+  }).max(50, {
+    message: 'タイトルは50文字以内で入力してください。',
   }),
-  description: z.string().optional(),
+  description: z.string().max(1000, {
+    message: '説明は1000文字以内で入力してください。',
+  }).optional(),
 });
 
 // Form schema for individual cards
 const cardFormSchema = z.object({
-  front: z.string().min(1, { message: '表面のテキストを入力してください。' }),
-  back: z.string().min(1, { message: '裏面のテキストを入力してください。' }),
+  front: z.string().min(1, { message: '表面のテキストを入力してください。' })
+    .max(100, { message: '表面は100文字以内で入力してください。' }),
+  back: z.string().min(1, { message: '裏面のテキストを入力してください。' })
+    .max(100, { message: '裏面は100文字以内で入力してください。' }),
 });
 
 type CardType = {
@@ -200,8 +206,9 @@ export function ManualCreateForm() {
               <FormItem>
                 <FormLabel>暗記カード帳のタイトル</FormLabel>
                 <FormControl>
-                  <Input placeholder="例）英検準一級英単語" {...field} />
+                  <Input placeholder="例）英検準一級英単語" maxLength={50} {...field} />
                 </FormControl>
+                <FormDescription>50文字以内で入力してください</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -217,11 +224,12 @@ export function ManualCreateForm() {
                   <Textarea
                     placeholder="このカード帳の内容や目的などを記入してください"
                     className="h-20"
+                    maxLength={1000}
                     {...field}
                   />
                 </FormControl>
                 <FormDescription>
-                  このカード帳の内容や目的などを記入してください。
+                  1000文字以内で入力してください
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -329,9 +337,11 @@ export function ManualCreateForm() {
                     <Textarea
                       placeholder="例）Memorize"
                       className="h-20"
+                      maxLength={100}
                       {...field}
                     />
                   </FormControl>
+                  <FormDescription>100文字以内で入力してください</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -347,9 +357,11 @@ export function ManualCreateForm() {
                     <Textarea
                       placeholder="例）記憶する、暗記する"
                       className="h-20"
+                      maxLength={100}
                       {...field}
                     />
                   </FormControl>
+                  <FormDescription>100文字以内で入力してください</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

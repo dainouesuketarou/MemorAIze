@@ -5,12 +5,15 @@ import { useEffect, useState } from 'react';
 import { MainNav } from '@/components/dashboard/main-nav';
 import { UserNav } from '@/components/dashboard/user-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Bell, BadgeHelp as Help, Search, BookOpen, Clock, BarChart } from 'lucide-react';
+import { Bell, BadgeHelp as Help, Search, BookOpen, Clock, BarChart, Brain, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Deck, Group } from '@prisma/client';
 import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 import { useRouter } from 'next/navigation';
+import { Card, CardContent } from '@/components/ui/card';
+import { AiLimitBadge } from '@/components/dashboard/ai-limit-badge';
+import { Loading } from '../loading';
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -20,6 +23,11 @@ interface DashboardShellProps {
   groupMode: boolean;
   setDecks: React.Dispatch<React.SetStateAction<DeckWithCardsAndGroups[]>>;
   setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+interface AiGenerationLimit {
+  count: number;
+  limit: number;
 }
 
 // 相対時間を計算する関数
@@ -51,12 +59,32 @@ export function DashboardShell({
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [limit, setLimit] = useState<AiGenerationLimit | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const fetchLimit = async () => {
+      try {
+        const response = await fetch('/api/ai-generation-limit');
+        const data = await response.json();
+        if (data.success) {
+          setLimit(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching AI generation limit:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLimit();
   }, []);
 
   const filteredDecks = decks.filter(deck =>
@@ -171,7 +199,8 @@ export function DashboardShell({
         )}
       >
         <div className="max-w-7xl mx-auto w-full px-8 space-y-3">
-          {Array.isArray(children)
+          <AiLimitBadge />
+          {loading ? <Loading /> : Array.isArray(children)
             ? children.map((child, i) => <div key={i}>{child}</div>)
             : <div>{children}</div>
           }
