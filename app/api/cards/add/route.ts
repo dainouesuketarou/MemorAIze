@@ -3,7 +3,7 @@ import { z } from 'zod';
 import OpenAI from 'openai';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 const prisma = new PrismaClient();
 const MONTHLY_LIMIT = 5;
@@ -24,8 +24,9 @@ function generatePrompt(data: z.infer<typeof addCardsSchema>) {
   const formatInstructions = {
     'term-meaning': '表に単語や用語、裏にその意味や説明を記載してください。',
     'question-answer': '表に問題、裏にその答えを記載してください。',
-    'custom': data.additionalInstructions || '表裏の内容を自由に設定してください。',
-    'auto': '内容に応じて最適な形式（単語/意味 または 問題/答え）を選択してください。',
+    custom:
+      data.additionalInstructions || '表裏の内容を自由に設定してください。',
+    auto: '内容に応じて最適な形式（単語/意味 または 問題/答え）を選択してください。',
   };
 
   return `
@@ -56,13 +57,16 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: '認証が必要です' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: '認証が必要です' },
+        { status: 401 },
+      );
     }
 
     // 月間生成回数をチェック
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const generationLimit = await prisma.aiGenerationLimit.upsert({
       where: {
         userId_month: {
@@ -79,10 +83,13 @@ export async function POST(req: Request) {
     });
 
     if (generationLimit.count >= MONTHLY_LIMIT) {
-      return NextResponse.json({
-        success: false,
-        error: '今月のAI生成回数の上限に達しました。来月までお待ちください。',
-      }, { status: 429 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: '今月のAI生成回数の上限に達しました。来月までお待ちください。',
+        },
+        { status: 429 },
+      );
     }
 
     const body = await req.json();
@@ -92,16 +99,17 @@ export async function POST(req: Request) {
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: 'gpt-4',
         messages: [
           {
-            role: "system",
-            content: "あなたは教育の専門家で、効果的な暗記カードを作成するエキスパートです。"
+            role: 'system',
+            content:
+              'あなたは教育の専門家で、効果的な暗記カードを作成するエキスパートです。',
           },
           {
-            role: "user",
-            content: prompt
-          }
+            role: 'user',
+            content: prompt,
+          },
         ],
         temperature: 0.7,
         max_tokens: 4096,
@@ -109,7 +117,7 @@ export async function POST(req: Request) {
 
       const response = completion.choices[0].message.content;
       let cards;
-      
+
       try {
         const jsonMatch = response?.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
@@ -124,51 +132,51 @@ export async function POST(req: Request) {
 
       // データベースにカードを保存
       const result = await prisma.$transaction(async (tx) => {
-        const savedCards = [];
-        
-        for (const card of cards) {
-          // カード作成
-          const savedCard = await tx.card.create({
-            data: {
-              deckId: validatedData.deckId,
-              front: card.front,
-              back: card.back,
-              status: 'UNLEARNED',
-              order: 0,
-            },
-          });
-          savedCards.push(savedCard);
-        }
+        // const savedCards = [];
 
-        // StudyHistory作成
-        await tx.studyHistory.create({
-          data: {
-            deckId: validatedData.deckId,
-            progress: 0,
-          },
-        });
+        // for (const card of cards) {
+        //   // カード作成
+        //   const savedCard = await tx.card.create({
+        //     data: {
+        //       deckId: validatedData.deckId,
+        //       front: card.front,
+        //       back: card.back,
+        //       status: 'UNLEARNED',
+        //       order: 0,
+        //     },
+        //   });
+        //   savedCards.push(savedCard);
+        // }
 
-        // Deckの進捗度更新
-        const deck = await tx.deck.findUnique({
-          where: { id: validatedData.deckId },
-          include: {
-            cards: true,
-          },
-        });
+        // // StudyHistory作成
+        // await tx.studyHistory.create({
+        //   data: {
+        //     deckId: validatedData.deckId,
+        //     progress: 0,
+        //   },
+        // });
 
-        if (deck) {
-          const totalCards = deck.cards.length;
-          const masteredCount = deck.cards.filter(card => card.status === 'MASTERED').length;
-          const progress = totalCards > 0 ? masteredCount / totalCards : 0;
+        // // Deckの進捗度更新
+        // const deck = await tx.deck.findUnique({
+        //   where: { id: validatedData.deckId },
+        //   include: {
+        //     cards: true,
+        //   },
+        // });
 
-          await tx.deck.update({
-            where: { id: deck.id },
-            data: {
-              cardCount: totalCards,
-              progress: progress,
-            },
-          });
-        }
+        // if (deck) {
+        //   const totalCards = deck.cards.length;
+        //   const masteredCount = deck.cards.filter(card => card.status === 'MASTERED').length;
+        //   const progress = totalCards > 0 ? masteredCount / totalCards : 0;
+
+        //   await tx.deck.update({
+        //     where: { id: deck.id },
+        //     data: {
+        //       cardCount: totalCards,
+        //       progress: progress,
+        //     },
+        //   });
+        // }
 
         // AI生成回数を更新
         await tx.aiGenerationLimit.update({
@@ -182,7 +190,7 @@ export async function POST(req: Request) {
           },
         });
 
-        return savedCards;
+        return cards;
       });
 
       return NextResponse.json({
@@ -194,33 +202,35 @@ export async function POST(req: Request) {
       });
     } catch (error: any) {
       console.error('OpenAI API Error:', error);
-      
+
       if (error.code === 'insufficient_quota') {
         return NextResponse.json(
-          { 
-            error: 'OpenAI APIの利用制限に達しました。しばらく時間をおいて再度お試しください。',
-            details: error.message
+          {
+            error:
+              'OpenAI APIの利用制限に達しました。しばらく時間をおいて再度お試しください。',
+            details: error.message,
           },
-          { status: 429 }
+          { status: 429 },
         );
       }
 
       return NextResponse.json(
-        { 
+        {
           error: 'AIによる暗記カードの生成に失敗しました',
-          details: error.message
+          details: error.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {
     console.error('Error in add cards API:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'リクエストの処理に失敗しました',
-        details: error instanceof Error ? error.message : '不明なエラーが発生しました'
+        details:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
-} 
+}

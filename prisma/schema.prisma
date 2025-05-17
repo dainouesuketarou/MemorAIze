@@ -28,6 +28,7 @@ model Deck {
     StudyHistory StudyHistory[]
     userId       String
     user         User           @relation(fields: [userId], references: [id])
+    deckSettings DeckSetting[]     @relation("DeckDeckSettings")
 }
 
 enum CardStatus {
@@ -42,8 +43,33 @@ model Card {
     back   String
     order  Int
     status CardStatus @default(UNLEARNED)
+    favorite Boolean @default(false)
     deck   Deck       @relation(fields: [deckId], references: [id])
     deckId String
+}
+
+enum FilterMode {
+  UNLEARNED
+  MASTERED
+  STRUGGLING
+  FAVORITE
+}
+
+model DeckSetting {
+  id         String     @id @default(uuid())
+  userId     String
+  deckId     String
+  autoSpeak  Boolean    @default(false)
+  reverse    Boolean    @default(false)
+  filterMode FilterMode[] @default([])
+  shuffle    Boolean    @default(false)
+  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime   @default(now())
+
+  user User @relation("UserDeckSettings", fields: [userId], references: [id])
+  deck Deck @relation("DeckDeckSettings", fields: [deckId], references: [id])
+
+  @@unique([userId, deckId])
 }
 
 model StudyHistory {
@@ -63,6 +89,7 @@ model User {
     updatedAt     DateTime  @updatedAt
     decks         Deck[]
     Group         Group[]
+    deckSettings  DeckSetting[]    @relation("UserDeckSettings")
     emailVerified DateTime?
     Account       Account[]
     Session       Session[]

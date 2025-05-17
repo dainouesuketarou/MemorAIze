@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/route';
 import { z } from 'zod';
 
 const createDeckSchema = z.object({
-  title: z.string().min(2),
-  cards: z.array(z.object({
-    front: z.string(),
-    back: z.string(),
-  })),
+  title: z.string().min(1),
+  cards: z.array(
+    z.object({
+      front: z.string(),
+      back: z.string(),
+    }),
+  ),
 });
 
 const prisma = new PrismaClient();
@@ -18,10 +20,7 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: '認証が必要です' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -54,11 +53,12 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Error creating deck:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'デッキの作成に失敗しました',
-        details: error instanceof Error ? error.message : '不明なエラーが発生しました'
+        details:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    return new NextResponse("Unauthorized", { status: 401 });
+    return new NextResponse('Unauthorized', { status: 401 });
   }
 
   try {
@@ -84,13 +84,13 @@ export async function GET() {
         groups: true,
       },
       orderBy: {
-        lastStudied: "desc",
+        lastStudied: 'desc',
       },
     });
 
     return NextResponse.json(decks);
   } catch (error) {
-    console.error("Error fetching decks:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    console.error('Error fetching decks:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

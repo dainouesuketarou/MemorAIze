@@ -8,7 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Home, BookOpen, LineChart } from 'lucide-react';
 import Link from 'next/link';
-import { PieChart, Pie, Cell, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  LineChart as RechartsLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { Deck, Group } from '@prisma/client';
 import { DeckWithCardsAndGroups } from '@/types/deck';
 import { Loading } from '@/components/loading';
@@ -20,7 +31,6 @@ import {
 } from '@/components/ui/dialog';
 import { DeckEditForm } from '@/components/decks/deck-edit-form';
 import { Edit2 } from 'lucide-react';
-
 
 // 相対時間を計算する関数
 const getRelativeTime = (dateString: string) => {
@@ -53,40 +63,47 @@ export default function DeckDetailsPage() {
   const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [deckData, setDeckData] = useState<any>(null);
-  const [editOpen, setEditOpen]   = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   // 進捗表示モードを2つに分ける
-  const [pieProgressMode, setPieProgressMode] = useState<'all'|'learned'>('all');
-  const [chartProgressMode, setChartProgressMode] = useState<'all'|'learned'>('all');
+  const [pieProgressMode, setPieProgressMode] = useState<'all' | 'learned'>(
+    'all',
+  );
+  const [chartProgressMode, setChartProgressMode] = useState<'all' | 'learned'>(
+    'all',
+  );
 
   useEffect(() => {
-    fetch('/api/groups').then(res => res.json()).then(setGroups);
-    fetch('/api/decks').then(res => res.json()).then((data) => {
-      setDecks(data.map((deck: any) => ({
-        ...deck,
-        cards: deck.cards || []
-      })));
-    });
-    console.log(deckId);
+    fetch('/api/groups')
+      .then((res) => res.json())
+      .then(setGroups);
+    fetch('/api/decks')
+      .then((res) => res.json())
+      .then((data) => {
+        setDecks(
+          data.map((deck: any) => ({
+            ...deck,
+            cards: deck.cards || [],
+          })),
+        );
+      });
   }, []);
 
   useEffect(() => {
     if (!deckId) return;
-    fetch(`/api/decks/${deckId}`)
-      .then(async res => {
-        if (!res.ok) {
-          // エラー時はnullをセット
-          setDeckData(null);
-          return;
-        }
-        // レスポンスが空の場合もnull
-        const text = await res.text();
-        if (!text) {
-          setDeckData(null);
-          return;
-        }
-        console.log(text);
-        setDeckData(JSON.parse(text));
-      });
+    fetch(`/api/decks/${deckId}`).then(async (res) => {
+      if (!res.ok) {
+        // エラー時はnullをセット
+        setDeckData(null);
+        return;
+      }
+      // レスポンスが空の場合もnull
+      const text = await res.text();
+      if (!text) {
+        setDeckData(null);
+        return;
+      }
+      setDeckData(JSON.parse(text));
+    });
   }, [deckId]);
 
   if (!deckId) {
@@ -122,68 +139,99 @@ export default function DeckDetailsPage() {
   }
 
   const totalCards = deckData.cards.length;
-  const masteredCount = deckData.cards.filter((card: { status: string }) => card.status === 'MASTERED').length;
-  const strugglingCount = deckData.cards.filter((card: { status: string }) => card.status === 'STRUGGLING').length;
-  const unlearnedCount = deckData.cards.filter((card: { status: string }) => card.status === 'UNLEARNED').length;
+  const masteredCount = deckData.cards.filter(
+    (card: { status: string }) => card.status === 'MASTERED',
+  ).length;
+  const strugglingCount = deckData.cards.filter(
+    (card: { status: string }) => card.status === 'STRUGGLING',
+  ).length;
+  const unlearnedCount = deckData.cards.filter(
+    (card: { status: string }) => card.status === 'UNLEARNED',
+  ).length;
   const learnedCount = masteredCount + strugglingCount;
 
   // 円グラフ用の進捗計算
-  const pieMasteredPercentage = pieProgressMode === 'all'
-    ? (totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0)
-    : (learnedCount > 0 ? Math.round((masteredCount / learnedCount) * 100) : 0);
-  const pieStrugglingPercentage = pieProgressMode === 'all'
-    ? (totalCards > 0 ? Math.round((strugglingCount / totalCards) * 100) : 0)
-    : (learnedCount > 0 ? Math.round((strugglingCount / learnedCount) * 100) : 0);
-  const pieUnlearnedPercentage = pieProgressMode === 'all'
-    ? (totalCards > 0 ? Math.round((unlearnedCount / totalCards) * 100) : 0)
-    : 0;
+  const pieMasteredPercentage =
+    pieProgressMode === 'all'
+      ? totalCards > 0
+        ? Math.round((masteredCount / totalCards) * 100)
+        : 0
+      : learnedCount > 0
+      ? Math.round((masteredCount / learnedCount) * 100)
+      : 0;
+  const pieStrugglingPercentage =
+    pieProgressMode === 'all'
+      ? totalCards > 0
+        ? Math.round((strugglingCount / totalCards) * 100)
+        : 0
+      : learnedCount > 0
+      ? Math.round((strugglingCount / learnedCount) * 100)
+      : 0;
+  const pieUnlearnedPercentage =
+    pieProgressMode === 'all'
+      ? totalCards > 0
+        ? Math.round((unlearnedCount / totalCards) * 100)
+        : 0
+      : 0;
 
-  const pieData = pieProgressMode === 'all' ? [
-    {
-      name: '覚えた',
-      value: masteredCount,
-      color: '#4ade80'
-    },
-    {
-      name: '苦手',
-      value: strugglingCount,
-      color: '#f87171'
-    },
-    {
-      name: '未学習',
-      value: unlearnedCount,
-      color: '#9ca3af'
-    }
-  ] : [
-    {
-      name: '覚えた',
-      value: masteredCount,
-      color: '#4ade80'
-    },
-    {
-      name: '苦手',
-      value: strugglingCount,
-      color: '#f87171'
-    }
-  ];
+  const pieData =
+    pieProgressMode === 'all'
+      ? [
+          {
+            name: '覚えた',
+            value: masteredCount,
+            color: '#4ade80',
+          },
+          {
+            name: '苦手',
+            value: strugglingCount,
+            color: '#f87171',
+          },
+          {
+            name: '未学習',
+            value: unlearnedCount,
+            color: '#9ca3af',
+          },
+        ]
+      : [
+          {
+            name: '覚えた',
+            value: masteredCount,
+            color: '#4ade80',
+          },
+          {
+            name: '苦手',
+            value: strugglingCount,
+            color: '#f87171',
+          },
+        ];
 
   // グラフデータの準備
   const chartData = deckData.progressHistory
     .map((history: StudyHistory) => {
       const totalCards = deckData.cards.length;
-      const masteredCount = deckData.cards.filter((card: { status: string }) => card.status === 'MASTERED').length;
-      const strugglingCount = deckData.cards.filter((card: { status: string }) => card.status === 'STRUGGLING').length;
+      const masteredCount = deckData.cards.filter(
+        (card: { status: string }) => card.status === 'MASTERED',
+      ).length;
+      const strugglingCount = deckData.cards.filter(
+        (card: { status: string }) => card.status === 'STRUGGLING',
+      ).length;
       const learnedCount = masteredCount + strugglingCount;
 
       // グラフ用の進捗計算
-      const progress = chartProgressMode === 'all'
-        ? (totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0)
-        : (learnedCount > 0 ? Math.round((masteredCount / learnedCount) * 100) : 0);
+      const progress =
+        chartProgressMode === 'all'
+          ? totalCards > 0
+            ? Math.round((masteredCount / totalCards) * 100)
+            : 0
+          : learnedCount > 0
+          ? Math.round((masteredCount / learnedCount) * 100)
+          : 0;
 
       return {
         ...history,
         date: getRelativeTime(history.createdAt),
-        progress
+        progress,
       };
     })
     .reverse();
@@ -226,7 +274,9 @@ export default function DeckDetailsPage() {
           <Card className="shadow-lg rounded-2xl border-0">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-lg font-bold text-primary">学習状況</CardTitle>
+                <CardTitle className="text-lg font-bold text-primary">
+                  学習状況
+                </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
                     variant={pieProgressMode === 'all' ? 'default' : 'outline'}
@@ -237,7 +287,9 @@ export default function DeckDetailsPage() {
                     全カード
                   </Button>
                   <Button
-                    variant={pieProgressMode === 'learned' ? 'default' : 'outline'}
+                    variant={
+                      pieProgressMode === 'learned' ? 'default' : 'outline'
+                    }
                     size="sm"
                     onClick={() => setPieProgressMode('learned')}
                     className="h-7 text-xs"
@@ -270,14 +322,18 @@ export default function DeckDetailsPage() {
                     <span className="inline-block w-4 h-4 rounded-full bg-[#4ade80] mr-2" />
                     <span>覚えた</span>
                   </div>
-                  <span className="font-bold text-[#4ade80]">{pieMasteredPercentage}%</span>
+                  <span className="font-bold text-[#4ade80]">
+                    {pieMasteredPercentage}%
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-base">
                   <div className="flex items-center">
                     <span className="inline-block w-4 h-4 rounded-full bg-[#f87171] mr-2" />
                     <span>苦手</span>
                   </div>
-                  <span className="font-bold text-[#f87171]">{pieStrugglingPercentage}%</span>
+                  <span className="font-bold text-[#f87171]">
+                    {pieStrugglingPercentage}%
+                  </span>
                 </div>
                 {pieProgressMode === 'all' && (
                   <div className="flex items-center justify-between text-base">
@@ -285,7 +341,9 @@ export default function DeckDetailsPage() {
                       <span className="inline-block w-4 h-4 rounded-full bg-[#9ca3af] mr-2" />
                       <span>未学習</span>
                     </div>
-                    <span className="font-bold text-[#9ca3af]">{pieUnlearnedPercentage}%</span>
+                    <span className="font-bold text-[#9ca3af]">
+                      {pieUnlearnedPercentage}%
+                    </span>
                   </div>
                 )}
               </div>
@@ -296,10 +354,14 @@ export default function DeckDetailsPage() {
           <Card className="shadow-lg rounded-2xl border-0">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-lg font-bold text-primary">暗記レベルの推移（直近15回）</CardTitle>
+                <CardTitle className="text-lg font-bold text-primary">
+                  暗記レベルの推移（直近15回）
+                </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
-                    variant={chartProgressMode === 'all' ? 'default' : 'outline'}
+                    variant={
+                      chartProgressMode === 'all' ? 'default' : 'outline'
+                    }
                     size="sm"
                     onClick={() => setChartProgressMode('all')}
                     className="h-7 text-xs"
@@ -307,7 +369,9 @@ export default function DeckDetailsPage() {
                     全カード
                   </Button>
                   <Button
-                    variant={chartProgressMode === 'learned' ? 'default' : 'outline'}
+                    variant={
+                      chartProgressMode === 'learned' ? 'default' : 'outline'
+                    }
                     size="sm"
                     onClick={() => setChartProgressMode('learned')}
                     className="h-7 text-xs"
@@ -325,17 +389,17 @@ export default function DeckDetailsPage() {
                     margin={{ top: 20, right: 40, bottom: 20, left: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="date" 
+                    <XAxis
+                      dataKey="date"
                       tick={{ fontSize: 12 }}
                       interval="preserveStartEnd"
                     />
-                    <YAxis 
-                      domain={[0, 100]} 
+                    <YAxis
+                      domain={[0, 100]}
                       tick={{ fontSize: 12 }}
                       tickFormatter={(value) => `${value}%`}
                     />
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number) => [`${value}%`, '進捗率']}
                       labelFormatter={(label) => `学習日時: ${label}`}
                     />
@@ -344,7 +408,12 @@ export default function DeckDetailsPage() {
                       dataKey="progress"
                       stroke="#8b5cf6"
                       strokeWidth={3}
-                      dot={{ r: 5, stroke: "#8b5cf6", strokeWidth: 2, fill: "#fff" }}
+                      dot={{
+                        r: 5,
+                        stroke: '#8b5cf6',
+                        strokeWidth: 2,
+                        fill: '#fff',
+                      }}
                       activeDot={{ r: 8 }}
                     />
                   </RechartsLineChart>
@@ -366,7 +435,10 @@ export default function DeckDetailsPage() {
             カードリスト
           </Button>
           <Link href={`/study/${deckId}`} className="flex-1 max-w-xs">
-            <Button size="lg" className="w-full text-base py-6 rounded-xl shadow bg-primary text-white hover:bg-primary/90">
+            <Button
+              size="lg"
+              className="w-full text-base py-6 rounded-xl shadow bg-primary text-white hover:bg-primary/90"
+            >
               <LineChart className="mr-2 h-5 w-5" />
               学習開始
             </Button>
@@ -375,26 +447,25 @@ export default function DeckDetailsPage() {
       </div>
 
       {/* ---------- デッキ編集モーダル ---------- */}
-<Dialog open={editOpen} onOpenChange={setEditOpen}>
-  <DialogContent className="max-w-lg">
-    <DialogHeader>
-      <DialogTitle>デッキ設定</DialogTitle>
-    </DialogHeader>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>デッキ設定</DialogTitle>
+          </DialogHeader>
 
-    <DeckEditForm
-      deckId={deckId as string}
-      initialTitle={deckData.title}
-      initialDescription={deckData.description}
-      onSuccess={async () => {
-        setEditOpen(false);
-        // 更新後に再フェッチ
-        const res = await fetch(`/api/decks/${deckId}`);
-        if (res.ok) setDeckData(await res.json());
-      }}
-    />
-  </DialogContent>
-</Dialog>
-
+          <DeckEditForm
+            deckId={deckId as string}
+            initialTitle={deckData.title}
+            initialDescription={deckData.description}
+            onSuccess={async () => {
+              setEditOpen(false);
+              // 更新後に再フェッチ
+              const res = await fetch(`/api/decks/${deckId}`);
+              if (res.ok) setDeckData(await res.json());
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }
