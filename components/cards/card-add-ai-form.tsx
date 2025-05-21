@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { LoaderCircle, MinusCircle, PlusCircle } from 'lucide-react';
@@ -33,7 +34,7 @@ const formSchema = z.object({
     .max(1000, { message: '学習内容は1000文字以内で入力してください。' })
     .optional(),
   cardFormat: z.enum(['term-meaning', 'question-answer', 'auto']),
-  cardCount: z.number().min(1).max(30),
+  cardAmount: z.enum(['few', 'normal', 'many']),
   additionalInstructions: z
     .string()
     .max(500, { message: '追加指示は500文字以内で入力してください。' })
@@ -49,21 +50,17 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [generatedCards, setGeneratedCards] = useState<{
-    cards: Array<{ id: string; front: string; back: string }>;
-  } | null>(null);
   const [generated, setGenerated] = useState<{
     cards: PreviewCard[];
   } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [cards, setCards] = useState<PreviewCard[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       content: '',
       cardFormat: 'auto',
-      cardCount: 10,
+      cardAmount: 'normal',
       additionalInstructions: '',
     },
   });
@@ -86,16 +83,6 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const increaseCardCount = () => {
-    const currentCount = form.getValues('cardCount');
-    form.setValue('cardCount', Math.min(currentCount + 5, 30));
-  };
-
-  const decreaseCardCount = () => {
-    const currentCount = form.getValues('cardCount');
-    form.setValue('cardCount', Math.max(currentCount - 5, 1));
-  };
-
   const handleRegenerate = async (
     additionalInstructions: string,
   ): Promise<PreviewCard[]> => {
@@ -111,13 +98,13 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
     if (!res.ok || !json.data?.cards?.length)
       throw new Error(json.error || '再生成に失敗しました');
 
-    /* 親 state 更新 → 子にも自動反映 */
-    setCards(json.data.cards);
-    return json.data.cards;
+    const newCards = json.data.cards;
+    setGenerated({ cards: newCards });
+    return newCards;
   };
 
-  const handleSaveCards = (cards: PreviewCard[]) => {
-    setCards(cards);
+  const handleSaveCards = (updatedCards: PreviewCard[]) => {
+    setGenerated((prev) => (prev ? { ...prev, cards: updatedCards } : null));
   };
 
   const handleSave = async () => {
@@ -129,7 +116,7 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deckId,
-          cards,
+          cards: generated.cards,
         }),
       });
       const json = await res.json();
@@ -139,7 +126,6 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
         description: 'AIによって生成されたカードがデッキに追加されました。',
       });
       setPreviewOpen(false);
-      setCards([]);
       setGenerated(null);
       onSuccess(json.data);
     } catch (e: any) {
@@ -196,7 +182,7 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
           deckId,
           content,
           cardFormat: values.cardFormat,
-          cardCount: values.cardCount,
+          cardAmount: values.cardAmount,
           additionalInstructions: values.additionalInstructions,
         }),
       });
@@ -208,7 +194,6 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
       }
 
       setGenerated(data.data);
-      setCards(data.data.cards);
       setPreviewOpen(true);
     } catch (error) {
       console.error('Error generating cards:', error);
@@ -376,47 +361,53 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
 
           <FormField
             control={form.control}
-            name="cardCount"
+            name="cardAmount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>カード枚数 (1-30)</FormLabel>
-                <div className="flex items-center space-x-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={decreaseCardCount}
-                    disabled={field.value <= 1}
-                    className="h-8 w-8"
+                <FormLabel>カード枚数</FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    className="flex flex-col space-y-1"
                   >
-                    <MinusCircle className="h-4 w-4" />
-                  </Button>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={30}
-                      className="w-20 text-center"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseInt(e.target.value, 10) || 1)
-                      }
-                    />
-                  </FormControl>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={increaseCardCount}
-                    disabled={field.value >= 30}
-                    className="h-8 w-8"
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm text-muted-foreground">枚</span>
-                </div>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="few" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        少なめ（1-5枚）
+                        <span className="text-sm text-muted-foreground block">
+                          暗記レベル40-60%を目指す
+                        </span>
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="normal" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        普通（5-20枚）
+                        <span className="text-sm text-muted-foreground block">
+                          暗記レベル60-80%を目指す
+                        </span>
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="many" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        多め（20-30枚）
+                        <span className="text-sm text-muted-foreground block">
+                          暗記レベル80-90%を目指す
+                        </span>
+                      </FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
                 <FormDescription>
-                  AIによる生成は最大30枚までです
+                  内容に応じて、AIが適切な枚数を選択します
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -460,13 +451,17 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
           <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>生成カードプレビュー</DialogTitle>
+              <DialogDescription>
+                生成されたカードを確認し、必要に応じて編集できます。
+              </DialogDescription>
             </DialogHeader>
             <PreviewCards
-              cards={cards}
+              cards={generated.cards}
               onSave={handleSave}
               onRegenerate={handleRegenerate}
               onCardsChange={handleSaveCards}
               isSaving={isLoading}
+              onClose={() => setPreviewOpen(false)}
             />
           </DialogContent>
         </Dialog>

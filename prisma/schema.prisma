@@ -67,7 +67,7 @@ model DeckSetting {
   createdAt  DateTime   @default(now())
 
   user User @relation("UserDeckSettings", fields: [userId], references: [id])
-  deck Deck @relation("DeckDeckSettings", fields: [deckId], references: [id])
+  deck Deck @relation("DeckDeckSettings", fields: [deckId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deckId])
 }

@@ -219,14 +219,7 @@ export default function DeckDetailsPage() {
       const learnedCount = masteredCount + strugglingCount;
 
       // グラフ用の進捗計算
-      const progress =
-        chartProgressMode === 'all'
-          ? totalCards > 0
-            ? Math.round((masteredCount / totalCards) * 100)
-            : 0
-          : learnedCount > 0
-          ? Math.round((masteredCount / learnedCount) * 100)
-          : 0;
+      const progress = totalCards > 0 ? history.progress : 0;
 
       return {
         ...history,
@@ -357,28 +350,6 @@ export default function DeckDetailsPage() {
                 <CardTitle className="text-lg font-bold text-primary">
                   暗記レベルの推移（直近15回）
                 </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={
-                      chartProgressMode === 'all' ? 'default' : 'outline'
-                    }
-                    size="sm"
-                    onClick={() => setChartProgressMode('all')}
-                    className="h-7 text-xs"
-                  >
-                    全カード
-                  </Button>
-                  <Button
-                    variant={
-                      chartProgressMode === 'learned' ? 'default' : 'outline'
-                    }
-                    size="sm"
-                    onClick={() => setChartProgressMode('learned')}
-                    className="h-7 text-xs"
-                  >
-                    学習済み
-                  </Button>
-                </div>
               </div>
             </CardHeader>
             <CardContent>

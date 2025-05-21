@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CardAddAiForm } from '@/components/cards/card-add-ai-form';
@@ -142,11 +143,7 @@ export default function CardsPage() {
     >
       <DashboardHeader
         heading={<div className="flex items-center gap-2">カード一覧</div>}
-        description={
-          <div className="flex items-center gap-2">
-            暗記カードの管理と編集を行います
-          </div>
-        }
+        description="暗記カードの管理と編集を行います"
       >
         <div className="flex gap-2">
           <Link href="/dashboard">
@@ -279,6 +276,9 @@ export default function CardsPage() {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>新しいカードを追加</DialogTitle>
+            <DialogDescription>
+              暗記カードをAIで生成するか、手動で作成できます。
+            </DialogDescription>
           </DialogHeader>
           <Tabs
             defaultValue={tab}
@@ -312,6 +312,9 @@ export default function CardsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>カードを編集</DialogTitle>
+            <DialogDescription>
+              カードの表裏の内容を編集できます。
+            </DialogDescription>
           </DialogHeader>
           {editingCard && (
             <CardEditForm
@@ -330,6 +333,9 @@ export default function CardsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>デッキ設定</DialogTitle>
+            <DialogDescription>
+              デッキのタイトルと説明を編集できます。
+            </DialogDescription>
           </DialogHeader>
           {currentDeck && (
             <DeckEditForm
