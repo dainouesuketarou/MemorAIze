@@ -93,6 +93,7 @@ model User {
     emailVerified DateTime?
     Account       Account[]
     Session       Session[]
+    loginHistory  LoginHistory[]
 }
 
 model Account {
@@ -139,4 +140,14 @@ model AiGenerationLimit {
     updatedAt DateTime @updatedAt
 
     @@unique([userId, month])
+}
+
+model LoginHistory {
+    id        String   @id @default(uuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    loginAt   DateTime @default(now())
+    createdAt DateTime @default(now())
+
+    @@index([userId, loginAt])
 }
