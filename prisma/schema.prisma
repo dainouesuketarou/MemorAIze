@@ -29,6 +29,7 @@ model Deck {
     userId       String
     user         User           @relation(fields: [userId], references: [id])
     deckSettings DeckSetting[]     @relation("DeckDeckSettings")
+    shareCode    String?        @unique
 }
 
 enum CardStatus {
