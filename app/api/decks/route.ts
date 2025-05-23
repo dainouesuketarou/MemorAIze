@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { z } from 'zod';
+import { getUniqueShareCode } from './share/route';
 
 const createDeckSchema = z.object({
   title: z.string().min(1),
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
             status: 'UNLEARNED',
           })),
         },
+        shareCode: await getUniqueShareCode(prisma),
       },
       include: {
         cards: true,

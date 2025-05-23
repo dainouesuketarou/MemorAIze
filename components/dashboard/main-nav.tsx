@@ -2,7 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BrainCircuit, FileText, Group as GroupIcon, Repeat } from 'lucide-react';
+import {
+  BrainCircuit,
+  FileText,
+  Group as GroupIcon,
+  Repeat,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Group } from '@prisma/client';
@@ -17,9 +22,9 @@ interface MainNavProps {
 }
 
 export function MainNav({
-  groups = [],        // デフォルトは空配列
-  decks = [],         // デフォルトは空配列
-  setDecks = () => {},// デフォルトは no-op
+  groups = [], // デフォルトは空配列
+  decks = [], // デフォルトは空配列
+  setDecks = () => {}, // デフォルトは no-op
   groupMode = false,
   setGroupMode = () => {},
 }: MainNavProps) {
@@ -29,28 +34,28 @@ export function MainNav({
     <div className="flex items-center">
       <Link href="/dashboard" className="mr-6 flex items-center space-x-2">
         <BrainCircuit className="h-6 w-6" />
-        <span className="hidden font-bold sm:inline-block">
-          MemorAIze
-        </span>
+        <span className="hidden font-bold sm:inline-block">MemorAIze</span>
       </Link>
       <nav className="flex items-center space-x-2">
-        <Link href="/dashboard">
+        {/* <Link href="/dashboard">
           <Button
             variant="ghost"
             className={cn(
-              "text-sm font-medium transition-colors py-2",
-              pathname === "/dashboard" ? "text-foreground" : "text-muted-foreground"
+              'text-sm font-medium transition-colors py-2',
+              pathname === '/dashboard'
+                ? 'text-foreground'
+                : 'text-muted-foreground',
             )}
           >
             <FileText className="mr-2 h-4 w-4" />
             暗記カード帳
           </Button>
-        </Link>
+        </Link> */}
         <Button
           variant={groupMode ? 'default' : 'ghost'}
           className={cn(
-            "text-sm font-medium transition-colors",
-            groupMode ? "text-foreground" : "text-muted-foreground"
+            'text-sm font-medium transition-colors',
+            groupMode ? 'text-foreground' : 'text-muted-foreground',
           )}
           onClick={() => setGroupMode(!groupMode)}
         >

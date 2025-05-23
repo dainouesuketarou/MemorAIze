@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 interface PreviewCard {
@@ -36,6 +37,7 @@ interface PreviewCardsProps {
   isSaving: boolean;
   onCardsChange: (cards: PreviewCard[]) => void;
   onRegenerate?: (additionalInstructions: string) => Promise<PreviewCard[]>;
+  onClose?: () => void;
 }
 
 export function PreviewCards({
@@ -45,6 +47,7 @@ export function PreviewCards({
   isSaving,
   onRegenerate,
   onCardsChange,
+  onClose,
 }: PreviewCardsProps) {
   const [cards, setCards] = useState<PreviewCard[]>(initialCards || []);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -55,7 +58,9 @@ export function PreviewCards({
   const [additionalInstructions, setAdditionalInstructions] = useState('');
 
   useEffect(() => {
-    setCards(initialCards);
+    if (JSON.stringify(initialCards) !== JSON.stringify(cards)) {
+      setCards(initialCards);
+    }
   }, [initialCards]);
 
   const commit = (next: PreviewCard[]) => {
@@ -69,12 +74,20 @@ export function PreviewCards({
   };
 
   const handleDelete = (id: string) => {
-    commit(cards.filter((c) => c.id !== id));
+    const updatedCards = cards.filter((c) => c.id !== id);
+    commit(updatedCards);
+
+    if (updatedCards.length === 0 && onClose) {
+      onClose();
+    }
   };
 
   const handleSaveEdit = () => {
     if (!editedCard) return;
-    commit(cards.map((c) => (c.id === editedCard.id ? editedCard : c)));
+    const updatedCards = cards.map((c) =>
+      c.id === editedCard.id ? editedCard : c,
+    );
+    commit(updatedCards);
     setEditingCardId(null);
     setEditedCard(null);
   };
@@ -105,14 +118,14 @@ export function PreviewCards({
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 max-h-[calc(80vh-200px)] overflow-y-auto pr-2">
+        <div className="flex items-center justify-between sticky top-0 bg-background z-10 pb-4">
           <h2 className="text-2xl font-bold">{title}</h2>
           <div className="flex gap-2">
             {onRegenerate && (
               <Button
                 variant="outline"
-                onClick={() => setDialogOpen(true)} // ★ モーダルを開く
+                onClick={() => setDialogOpen(true)}
                 className="flex items-center gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -263,6 +276,9 @@ export function PreviewCards({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>カードをブラッシュアップ</DialogTitle>
+            <DialogDescription>
+              追加の指示を入力して、カードの内容を改善できます。
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">

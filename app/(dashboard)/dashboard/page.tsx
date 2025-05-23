@@ -27,22 +27,40 @@ export default function DashboardPage() {
 
     // デッキ一覧取得（cards／groups がない場合は空配列で初期化）
     fetch('/api/decks')
-      .then(res => res.json())
+      .then((res) => res.json())
       .then((data: Partial<DeckWithCardsAndGroups>[]) => {
-        const mapped = data.map(d => ({
+        const mapped = data.map((d) => ({
           ...d,
           cards: d.cards ?? [],
           groups: d.groups ?? [],
         })) as DeckWithCardsAndGroups[];
         setDecks(mapped);
       })
-      .catch(e => console.error('デッキ取得エラー:', e));
+      .catch((e) => console.error('デッキ取得エラー:', e));
   }, [session]);
 
+  useEffect(() => {
+    const refresh = () =>
+      fetch('/api/decks')
+        .then((res) => res.json())
+        .then((data: Partial<DeckWithCardsAndGroups>[]) => {
+          const mapped = data.map((d) => ({
+            ...d,
+            cards: d.cards ?? [],
+            groups: d.groups ?? [],
+          })) as DeckWithCardsAndGroups[];
+          setDecks(mapped);
+        })
+        .catch((e) => console.error('デッキ取得エラー:', e)); // fetchDecksはデッキ一覧を再取得する関数
+    window.addEventListener('refreshDecks', refresh);
+    return () => window.removeEventListener('refreshDecks', refresh);
+  }, []);
+
   // グループ選択フィルタリング
-  const filteredDecks = selectedGroup === 'all'
-    ? decks
-    : decks.filter(d => d.groups.some(g => g.id === selectedGroup));
+  const filteredDecks =
+    selectedGroup === 'all'
+      ? decks
+      : decks.filter((d) => d.groups.some((g) => g.id === selectedGroup));
 
   return (
     <DashboardShell
@@ -64,8 +82,8 @@ export default function DashboardPage() {
         </Link>
       </DashboardHeader>
 
-      <div className="flex">
-        <div className="flex-1">
+      <div className="flex flex-row flex-nowrap space-4 overflow-x-auto">
+        <div className="flex-1 min-w-0">
           <DeckList
             decks={filteredDecks}
             groupMode={groupMode}
@@ -73,16 +91,18 @@ export default function DashboardPage() {
             setDecks={setDecks}
           />
         </div>
-        <Sidebar
-          groups={groups}
-          setGroups={setGroups}
-          selectedGroup={selectedGroup}
-          setSelectedGroup={setSelectedGroup}
-          newGroupName={newGroupName}
-          setNewGroupName={setNewGroupName}
-          showGroupInput={showGroupInput}
-          setShowGroupInput={setShowGroupInput}
-        />
+        <div className="mt-6 lg:mt-0 lg:ml-6">
+          <Sidebar
+            groups={groups}
+            setGroups={setGroups}
+            selectedGroup={selectedGroup}
+            setSelectedGroup={setSelectedGroup}
+            newGroupName={newGroupName}
+            setNewGroupName={setNewGroupName}
+            showGroupInput={showGroupInput}
+            setShowGroupInput={setShowGroupInput}
+          />
+        </div>
       </div>
     </DashboardShell>
   );

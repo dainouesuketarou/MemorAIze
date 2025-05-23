@@ -1,13 +1,13 @@
 // app/api/auth/[...nextauth]/route.ts
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { NextAuthOptions } from "next-auth";
-import NextAuth from "next-auth/next";
-import GoogleProvider from "next-auth/providers/google";
-import EmailProvider from "next-auth/providers/email";
-import { prisma } from "@/lib/prisma";
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { createHash } from "crypto";
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import { NextAuthOptions } from 'next-auth';
+import NextAuth from 'next-auth/next';
+import GoogleProvider from 'next-auth/providers/google';
+import EmailProvider from 'next-auth/providers/email';
+import { prisma } from '@/lib/prisma';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { createHash } from 'crypto';
 
 // AWS SESクライアントの設定
 const sesClient = new SESClient({
@@ -19,9 +19,9 @@ const sesClient = new SESClient({
 });
 
 /** ★ ここが肝心 ── Node ランタイムを強制 */
-export const runtime = "nodejs";
+export const runtime = 'nodejs';
 /** ★ ついでに SSG 判定も避ける */
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 /** 設定は変数に切り出して、getServerSession でも再利用できるよう export しておく */
 export const authOptions: NextAuthOptions = {
@@ -30,6 +30,14 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      profile(profile) {
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture,
+        };
+      },
     }),
     EmailProvider({
       from: process.env.AWS_SES_FROM_EMAIL,
@@ -40,10 +48,17 @@ export const authOptions: NextAuthOptions = {
       },
       sendVerificationRequest: async ({ identifier, url, token }) => {
         try {
-          console.log("→ AWS_REGION:", process.env.AWS_REGION)
-          console.log("→ AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID?.slice(0,4), "…")
-          console.log("→ AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "set" : "＜empty＞")
-          console.log("→ AWS_SES_FROM_EMAIL:", process.env.AWS_SES_FROM_EMAIL)
+          console.log('→ AWS_REGION:', process.env.AWS_REGION);
+          console.log(
+            '→ AWS_ACCESS_KEY_ID:',
+            process.env.AWS_ACCESS_KEY_ID?.slice(0, 4),
+            '…',
+          );
+          console.log(
+            '→ AWS_SECRET_ACCESS_KEY:',
+            process.env.AWS_SECRET_ACCESS_KEY ? 'set' : '＜empty＞',
+          );
+          console.log('→ AWS_SES_FROM_EMAIL:', process.env.AWS_SES_FROM_EMAIL);
 
           const command = new SendEmailCommand({
             Source: process.env.AWS_SES_FROM_EMAIL,
@@ -52,8 +67,8 @@ export const authOptions: NextAuthOptions = {
             },
             Message: {
               Subject: {
-                Data: "MemorAIzeへのワンタイムパスワード",
-                Charset: "UTF-8",
+                Data: 'MemorAIzeへのワンタイムパスワード',
+                Charset: 'UTF-8',
               },
               Body: {
                 Html: {
@@ -64,81 +79,127 @@ export const authOptions: NextAuthOptions = {
                     <p>このワンタイムパスワードは10分間有効です。</p>
                     <p>このメールに心当たりがない場合は、無視してください。</p>
                   `,
-                  Charset: "UTF-8",
+                  Charset: 'UTF-8',
                 },
               },
             },
           });
 
           const response = await sesClient.send(command);
-          console.log("Email sent successfully:", response);
+          console.log('Email sent successfully:', response);
         } catch (error) {
-          console.error("Error sending verification email:", error);
+          console.error('Error sending verification email:', error);
           if (error instanceof Error) {
-            console.error("Error details:", {
+            console.error('Error details:', {
               name: error.name,
               message: error.message,
               stack: error.stack,
             });
           }
-          throw new Error("メールの送信に失敗しました。管理者にお問い合わせください。");
+          throw new Error(
+            'メールの送信に失敗しました。管理者にお問い合わせください。',
+          );
         }
       },
     }),
     CredentialsProvider({
-      id: "otp",              
-      name: "OTP Login",
+      id: 'otp',
+      name: 'OTP Login',
       credentials: {
-        email: { label: "Email", type: "text" },
-        otp:   { label: "OTP",   type: "text" },
+        email: { label: 'Email', type: 'text' },
+        otp: { label: 'OTP', type: 'text' },
       },
       async authorize(creds) {
         const email = creds?.email?.toLowerCase();
-        const otp   = creds?.otp;
+        const otp = creds?.otp;
         if (!email || !otp) return null;
-        console.log("→ email:", email)
-        console.log("→ otp:", otp)
+        console.log('→ email:', email);
+        console.log('→ otp:', otp);
 
         const secret = process.env.NEXTAUTH_SECRET!;
-        const hashed = createHash("sha256").update(`${otp}${secret}`).digest("hex");
-      
+        const hashed = createHash('sha256')
+          .update(`${otp}${secret}`)
+          .digest('hex');
+
         const record = await prisma.verificationToken.findFirst({
           where: { identifier: email, token: hashed },
         });
-        console.log("→ record:", record)
+        console.log('→ record:', record);
         if (!record || record.expires < new Date()) return null;
-      
-        await prisma.verificationToken.delete({ 
+
+        await prisma.verificationToken.delete({
           where: {
-            identifier_token: {   // @@unique([identifier, token]) が必須
+            identifier_token: {
+              // @@unique([identifier, token]) が必須
               identifier: email,
               token: hashed,
             },
           },
         });
-      
+
         return prisma.user.upsert({
-          where:  { email },
+          where: { email },
           update: {},
           create: { email },
         });
-      }
+      },
     }),
   ],
   pages: {
-    signIn: "/login",
-    verifyRequest: "/auth/email-sent",
+    signIn: '/login',
+    verifyRequest: '/auth/email-sent',
   },
   session: {
-    strategy: "jwt",
+    strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30日
   },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === 'google') {
+        try {
+          // Google認証時のユーザー情報を確実に保存
+          await prisma.user.upsert({
+            where: { email: user.email! },
+            update: {
+              name: user.name,
+              image: user.image,
+              emailVerified: new Date(),
+            },
+            create: {
+              email: user.email!,
+              name: user.name,
+              image: user.image,
+              emailVerified: new Date(),
+            },
+          });
+          return true;
+        } catch (error) {
+          console.error('Error in signIn callback:', error);
+          return false;
+        }
+      }
+      return true;
+    },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub!;
+        // セッションにユーザー情報を追加
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub! },
+        });
+        if (dbUser) {
+          session.user.name = dbUser.name;
+          session.user.email = dbUser.email;
+          session.user.image = dbUser.image;
+        }
       }
       return session;
+    },
+    async jwt({ token, user, account }) {
+      if (account && user) {
+        token.sub = user.id;
+      }
+      return token;
     },
   },
 };
