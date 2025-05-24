@@ -118,32 +118,34 @@ export function PreviewCards({
 
   return (
     <>
-      <div className="space-y-6 max-h-[calc(80vh-200px)] overflow-y-auto pr-2">
-        <div className="flex items-center justify-between sticky top-0 bg-background z-10 pb-4">
-          <h2 className="text-2xl font-bold">{title}</h2>
-          <div className="flex gap-2">
+      <div className="space-y-6 h-[calc(100vh-100px)] overflow-y-auto pr-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between sticky top-0 bg-background z-10 p-4 gap-4 sm:gap-0 border-b">
+          <h2 className="text-xl sm:text-2xl font-bold">{title}</h2>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             {onRegenerate && (
               <Button
                 variant="outline"
                 onClick={() => setDialogOpen(true)}
-                className="flex items-center gap-2"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto"
               >
                 <RefreshCw className="h-4 w-4" />
-                ブラッシュアップ
+                <span className="whitespace-nowrap">ブラッシュアップ</span>
               </Button>
             )}
             <Button
               onClick={onSave}
               disabled={isSaving}
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto"
             >
               <Save className="h-4 w-4" />
-              {isSaving ? '保存中...' : '保存する'}
+              <span className="whitespace-nowrap">
+                {isSaving ? '保存中...' : '保存する'}
+              </span>
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
           {cards.map((card) => (
             <Card
               key={card.id}
