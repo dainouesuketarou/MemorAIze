@@ -380,7 +380,6 @@ export default function StudyPage() {
       <div className="w-full mb-4 sm:mb-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
           <div className="flex items-center gap-2">
-            <Star className="h-5 w-5 text-primary" />
             <span className="font-medium">{currentIndex + 1}</span>
             <span className="text-muted-foreground">/</span>
             <span className="text-muted-foreground">{totalCards}</span>
@@ -442,7 +441,7 @@ export default function StudyPage() {
           >
             <Card
               className={cn(
-                'relative flex items-center justify-center p-4 sm:p-8 cursor-grab select-none min-h-[300px] sm:min-h-0 transition-transform duration-200 touch-none',
+                'relative flex items-center justify-center p-4 sm:p-8 cursor-grab select-none min-h-[300px] sm:min-h-[500px] transition-transform duration-200 touch-none',
                 dragState.isDragging && 'cursor-grabbing',
                 dragState.direction === 'left' && 'rotate-[-5deg]',
                 dragState.direction === 'right' && 'rotate-[5deg]',

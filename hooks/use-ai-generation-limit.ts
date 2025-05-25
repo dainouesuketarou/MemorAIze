@@ -28,4 +28,4 @@ export function useAiGenerationLimit() {
   }, [fetchLimit]);
 
   return { limit, loading, refreshLimit: fetchLimit };
-} 
+}

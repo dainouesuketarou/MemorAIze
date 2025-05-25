@@ -1,9 +1,12 @@
 import React from 'react';
 import { Award, Check, Lock } from 'lucide-react';
-import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import { SubscriptionPlan } from '@prisma/client';
 import { useRouter } from 'next/navigation';
+import { useDispatch, useSelector } from 'react-redux';
+import { useEffect, useState } from 'react';
+import { Subscription } from '@prisma/client';
+import { setSubscription } from '@/lib/store/slices/userSlice';
 
 interface PlanFeatures {
   name: string;
@@ -13,7 +16,6 @@ interface PlanFeatures {
   bgColor: string;
   price: string;
   upgradeable: boolean;
-  downgradeable: boolean;
 }
 
 const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
@@ -25,7 +27,6 @@ const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     bgColor: 'bg-gray-100',
     price: '¥0',
     upgradeable: true,
-    downgradeable: false,
   },
   PRO_MONTHLY: {
     name: 'PRO_MONTHLY',
@@ -39,8 +40,7 @@ const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     color: 'text-blue-600',
     bgColor: 'bg-blue-100',
     price: '¥980/月',
-    upgradeable: true,
-    downgradeable: true,
+    upgradeable: false,
   },
   PRO_YEARLY: {
     name: 'PRO_YEARLY',
@@ -56,7 +56,6 @@ const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     bgColor: 'bg-purple-100',
     price: '¥9,800/年',
     upgradeable: false,
-    downgradeable: true,
   },
 };
 
@@ -65,16 +64,33 @@ export const UserPlan: React.FC = () => {
   const subscription = useSelector(
     (state: RootState) => state.user.subscription,
   );
+  const dispatch = useDispatch();
   const currentPlan = subscription?.plan || 'FREE';
   const planFeatures = PLAN_FEATURES[currentPlan];
 
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        // サブスクリプション情報を取得
+        const subscriptionResponse = await fetch('/api/subscription/status');
+        if (!subscriptionResponse.ok) {
+          throw new Error('サブスクリプション情報の取得に失敗しました');
+        }
+
+        const subscriptionData: Subscription =
+          await subscriptionResponse.json();
+
+        // Reduxの状態を更新
+        dispatch(setSubscription(subscriptionData));
+      } catch (error) {
+        console.error('サブスクリプション情報の取得に失敗しました:', error);
+      }
+    };
+    fetchSubscription();
+  }, []);
+
   const handlePlanChange = () => {
-    if (planFeatures.upgradeable) {
-      router.push('/subscription');
-    } else if (planFeatures.downgradeable) {
-      // ダウングレードの処理（必要に応じて実装）
-      router.push('/subscription/manage');
-    }
+    router.push('/subscription');
   };
 
   return (
@@ -111,26 +127,20 @@ export const UserPlan: React.FC = () => {
         ))}
       </div>
       <div className="pt-4 mt-4 border-t border-gray-100">
-        {planFeatures.upgradeable && (
+        {planFeatures.upgradeable ? (
           <button
             onClick={handlePlanChange}
             className="w-full py-2 px-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-white font-medium hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-sm hover:shadow transform hover:-translate-y-0.5"
           >
             プランをアップグレード
           </button>
-        )}
-        {planFeatures.downgradeable && (
+        ) : (
           <button
             onClick={handlePlanChange}
             className="w-full py-2 px-4 bg-gray-100 text-gray-600 rounded-lg font-medium hover:bg-gray-200 transition-all duration-300"
           >
             プランを管理
           </button>
-        )}
-        {!planFeatures.upgradeable && !planFeatures.downgradeable && (
-          <div className="text-center text-gray-500 text-sm py-2">
-            現在のプランは最適なプランです
-          </div>
         )}
       </div>
     </div>
