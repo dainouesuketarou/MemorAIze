@@ -81,6 +81,24 @@ model StudyHistory {
     createdAt DateTime @default(now())
 }
 
+enum StudyPurpose {
+  QUALIFICATION // 資格対策
+  SCHOOL_EXAM // 学校の試験対策
+  QUIZ_TRAINING // クイズトレーニング
+  LANGUAGE_LEARNING // 語学学習
+  OTHER // その他
+}
+
+model UserStudyPurpose {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   StudyPurpose
+  createdAt DateTime @default(now())
+
+  @@unique([userId, purpose])
+}
+
 model User {
     id            String    @id @default(uuid())
     email         String    @unique
@@ -97,6 +115,8 @@ model User {
     loginHistory  LoginHistory[]
     subscription  Subscription?
     stripeCustomerId String? @unique
+    studyPurposes UserStudyPurpose[]
+    isOnboarded   Boolean   @default(false)
 }
 
 model Account {
