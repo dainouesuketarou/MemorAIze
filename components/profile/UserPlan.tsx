@@ -1,25 +1,79 @@
 import React from 'react';
-import { Award, Check } from 'lucide-react';
+import { Award, Check, Lock } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import { SubscriptionPlan } from '@prisma/client';
+import { useRouter } from 'next/navigation';
 
-interface PlanProps {
-  plan: {
-    name: string;
-    features: string[];
-    isActive: boolean;
-  };
+interface PlanFeatures {
+  name: string;
+  displayName: string;
+  features: string[];
+  color: string;
+  bgColor: string;
+  price: string;
+  upgradeable: boolean;
+  downgradeable: boolean;
 }
 
-export const UserPlan: React.FC<PlanProps> = ({ plan }) => {
-  const getPlanColor = () => {
-    switch (plan.name.toLowerCase()) {
-      case '無料':
-        return 'text-gray-600 bg-gray-100';
-      case 'プレミアム':
-        return 'text-purple-600 bg-purple-100';
-      case 'プロ':
-        return 'text-blue-600 bg-blue-100';
-      default:
-        return 'text-teal-600 bg-teal-100';
+const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
+  FREE: {
+    name: 'FREE',
+    displayName: '無料',
+    features: ['最大10個のデッキ', '基本的な学習機能', '基本的な統計'],
+    color: 'text-gray-600',
+    bgColor: 'bg-gray-100',
+    price: '¥0',
+    upgradeable: true,
+    downgradeable: false,
+  },
+  PRO_MONTHLY: {
+    name: 'PRO_MONTHLY',
+    displayName: 'プロ（月額）',
+    features: [
+      '無制限のデッキ',
+      '高度な統計',
+      'デッキの共有機能',
+      '優先サポート',
+    ],
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
+    price: '¥980/月',
+    upgradeable: true,
+    downgradeable: true,
+  },
+  PRO_YEARLY: {
+    name: 'PRO_YEARLY',
+    displayName: 'プロ（年額）',
+    features: [
+      '無制限のデッキ',
+      '高度な統計',
+      'デッキの共有機能',
+      '優先サポート',
+      '2ヶ月分お得',
+    ],
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100',
+    price: '¥9,800/年',
+    upgradeable: false,
+    downgradeable: true,
+  },
+};
+
+export const UserPlan: React.FC = () => {
+  const router = useRouter();
+  const subscription = useSelector(
+    (state: RootState) => state.user.subscription,
+  );
+  const currentPlan = subscription?.plan || 'FREE';
+  const planFeatures = PLAN_FEATURES[currentPlan];
+
+  const handlePlanChange = () => {
+    if (planFeatures.upgradeable) {
+      router.push('/subscription');
+    } else if (planFeatures.downgradeable) {
+      // ダウングレードの処理（必要に応じて実装）
+      router.push('/subscription/manage');
     }
   };
 
@@ -28,24 +82,26 @@ export const UserPlan: React.FC<PlanProps> = ({ plan }) => {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-800">現在のプラン</h2>
         <div
-          className={`py-1 px-3 rounded-full text-sm font-medium ${getPlanColor()}`}
+          className={`py-1 px-3 rounded-full text-sm font-medium ${planFeatures.color} ${planFeatures.bgColor}`}
         >
-          {plan.name}
+          {planFeatures.displayName}
         </div>
       </div>
       <div className="flex items-center mb-4">
-        <div className="w-10 h-10 flex-shrink-0 rounded-full bg-purple-100 flex items-center justify-center text-purple-500">
+        <div
+          className={`w-10 h-10 flex-shrink-0 rounded-full ${planFeatures.bgColor} flex items-center justify-center ${planFeatures.color}`}
+        >
           <Award size={20} />
         </div>
         <div className="ml-4">
-          <p className="font-medium text-gray-800">{plan.name}プラン</p>
-          <p className="text-sm text-gray-500">
-            {plan.isActive ? '有効' : '無効'}
+          <p className="font-medium text-gray-800">
+            {planFeatures.displayName}プラン
           </p>
+          <p className="text-sm text-gray-500">{planFeatures.price}</p>
         </div>
       </div>
       <div className="space-y-2 mt-4">
-        {plan.features.map((feature, index) => (
+        {planFeatures.features.map((feature, index) => (
           <div key={index} className="flex items-start">
             <div className="text-green-500 mt-0.5 mr-2">
               <Check size={16} />
@@ -55,9 +111,27 @@ export const UserPlan: React.FC<PlanProps> = ({ plan }) => {
         ))}
       </div>
       <div className="pt-4 mt-4 border-t border-gray-100">
-        <button className="w-full py-2 px-4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg text-white font-medium hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-sm hover:shadow transform hover:-translate-y-0.5">
-          プランをアップグレード
-        </button>
+        {planFeatures.upgradeable && (
+          <button
+            onClick={handlePlanChange}
+            className="w-full py-2 px-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-white font-medium hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-sm hover:shadow transform hover:-translate-y-0.5"
+          >
+            プランをアップグレード
+          </button>
+        )}
+        {planFeatures.downgradeable && (
+          <button
+            onClick={handlePlanChange}
+            className="w-full py-2 px-4 bg-gray-100 text-gray-600 rounded-lg font-medium hover:bg-gray-200 transition-all duration-300"
+          >
+            プランを管理
+          </button>
+        )}
+        {!planFeatures.upgradeable && !planFeatures.downgradeable && (
+          <div className="text-center text-gray-500 text-sm py-2">
+            現在のプランは最適なプランです
+          </div>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { DeckCard } from './DeckCard';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
+import { ImportDeckButton } from '../deck/ImportDeckButton';
 
 interface Deck {
   id: string;
@@ -137,13 +138,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
                 onChange={(e) => setImportCode(e.target.value)}
                 disabled={importing}
               />
-              <button
-                className="bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded transition-all disabled:opacity-50 w-full sm:w-auto"
-                onClick={handleImport}
-                disabled={importing}
-              >
-                {importing ? 'インポート中...' : 'インポート'}
-              </button>
+              <ImportDeckButton onImport={handleImport} />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">

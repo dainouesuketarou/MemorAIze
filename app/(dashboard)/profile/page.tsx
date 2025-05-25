@@ -52,18 +52,7 @@ export default function ProfilePage() {
                 username={user.name || 'ユーザー名'}
                 email={user.email}
               />
-              <UserPlan
-                plan={{
-                  name: 'プレミアム',
-                  features: [
-                    '無制限カード',
-                    '高度な統計',
-                    'オフラインモード',
-                    '優先サポート',
-                  ],
-                  isActive: true,
-                }}
-              />
+              <UserPlan />
             </div>
           </div>
           <div className="lg:col-span-2">

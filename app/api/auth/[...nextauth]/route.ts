@@ -157,8 +157,37 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
         try {
-          // Google認証時のユーザー情報を確実に保存
-          await prisma.user.upsert({
+          // 既存のユーザーを検索
+          const existingUser = await prisma.user.findUnique({
+            where: { email: user.email! },
+            include: { Account: true, subscription: true },
+          });
+
+          // 既存のユーザーが存在し、かつGoogleアカウントがリンクされていない場合
+          if (
+            existingUser &&
+            !existingUser.Account.some((acc) => acc.provider === 'google')
+          ) {
+            // 既存のユーザーにGoogleアカウントをリンク
+            await prisma.account.create({
+              data: {
+                userId: existingUser.id,
+                type: account.type,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+                access_token: account.access_token,
+                expires_at: account.expires_at,
+                token_type: account.token_type,
+                scope: account.scope,
+                id_token: account.id_token,
+                session_state: account.session_state,
+              },
+            });
+            return true;
+          }
+
+          // 新規ユーザーの作成または既存ユーザーの更新
+          const dbUser = await prisma.user.upsert({
             where: { email: user.email! },
             update: {
               name: user.name,
@@ -172,6 +201,28 @@ export const authOptions: NextAuthOptions = {
               emailVerified: new Date(),
             },
           });
+
+          // 新規ユーザーの場合、Freeプランを設定
+          if (!existingUser) {
+            await prisma.subscription.create({
+              data: {
+                userId: dbUser.id,
+                plan: 'FREE',
+                status: 'ACTIVE',
+              },
+            });
+
+            // 今月のAI使用制限を設定
+            const now = new Date();
+            await prisma.aiGenerationLimit.create({
+              data: {
+                userId: dbUser.id,
+                month: new Date(now.getFullYear(), now.getMonth(), 1),
+                count: 0,
+              },
+            });
+          }
+
           return true;
         } catch (error) {
           console.error('Error in signIn callback:', error);

@@ -95,6 +95,8 @@ model User {
     Account       Account[]
     Session       Session[]
     loginHistory  LoginHistory[]
+    subscription  Subscription?
+    stripeCustomerId String? @unique
 }
 
 model Account {
@@ -151,4 +153,31 @@ model LoginHistory {
     createdAt DateTime @default(now())
 
     @@index([userId, loginAt])
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO_MONTHLY
+  PRO_YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+  TRIALING
+}
+
+model Subscription {
+    id                    String   @id @default(cuid())
+    userId               String   @unique
+    user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    stripeSubscriptionId String?  @unique
+    stripePriceId        String?
+    stripeCurrentPeriodEnd DateTime?
+    plan                 SubscriptionPlan @default(FREE)
+    status               SubscriptionStatus @default(ACTIVE)
+    createdAt            DateTime @default(now())
+    updatedAt            DateTime @updatedAt
 }
