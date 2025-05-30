@@ -432,7 +432,7 @@ export function AiGenerateForm() {
                         <RadioGroupItem value="few" />
                       </FormControl>
                       <FormLabel className="font-normal">
-                        少なめ（1-5枚）
+                        少なめ（最大5枚）
                         <span className="text-sm text-muted-foreground block">
                           暗記レベル40-60%を目指す
                         </span>
@@ -443,7 +443,7 @@ export function AiGenerateForm() {
                         <RadioGroupItem value="normal" />
                       </FormControl>
                       <FormLabel className="font-normal">
-                        普通（5-20枚）
+                        普通（最大20枚）
                         <span className="text-sm text-muted-foreground block">
                           暗記レベル60-80%を目指す
                         </span>
@@ -454,7 +454,7 @@ export function AiGenerateForm() {
                         <RadioGroupItem value="many" />
                       </FormControl>
                       <FormLabel className="font-normal">
-                        多め（20-30枚）
+                        多め（最大30枚）
                         <span className="text-sm text-muted-foreground block">
                           暗記レベル80-90%を目指す
                         </span>

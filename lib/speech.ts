@@ -38,34 +38,27 @@ const LANG_MAP: Record<string, string> = {
 
 /** 文字列から言語コードを返す */
 export const detectLang = (text: string): string => {
-  console.log('[TTS] detectLang input:', text);
   if (/^[\u3040-\u30FF\u4E00-\u9FFF]+$/.test(text)) return 'ja';
   if (/^[A-Za-z\s',\.]+$/.test(text)) return 'en';
   const code3 = franc(text, { minLength: 1 });
   const lang = LANG_MAP[code3] || 'en';
-  console.log('[TTS] franc code:', code3, '→', lang);
   return lang;
 };
 
 /** 言語に合う voice を選ぶ */
 const pickVoice = (lang: string): SpeechSynthesisVoice | null => {
   const voices = speechSynthesis.getVoices();
-  console.log(
-    '[TTS] available voices langs:',
-    voices.map((v) => v.lang),
-  );
   const v = voices.find((v) => v.lang.toLowerCase().startsWith(lang));
-  console.log('[TTS] pickVoice result:', v?.name, v?.lang);
   return v || null;
 };
 
 /** テキストを音声で読み上げ */
 export const speak = (text: string) => {
-  console.log('[TTS] speak():', text);
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    console.warn('[TTS] not supported');
     return;
   }
+
+  speechSynthesis.cancel();
 
   const lang = detectLang(text);
   const utter = new SpeechSynthesisUtterance(text);
@@ -84,7 +77,6 @@ export const speak = (text: string) => {
   // voices がまだロードされていなければ待つ
   if (!speechSynthesis.getVoices().length) {
     const onVoicesChanged = () => {
-      console.log('[TTS] voiceschanged');
       speechSynthesis.speak(utter);
       speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
     };
@@ -107,6 +99,5 @@ export const speakFrontOrBack = (
     : reverse
     ? card.back
     : card.front;
-  console.log('[TTS] speakFrontOrBack →', text);
   speak(text);
 };

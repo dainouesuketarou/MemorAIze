@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { createHash } from 'crypto';
+import { Adapter, AdapterUser } from 'next-auth/adapters';
 
 // AWS SESクライアントの設定
 const sesClient = new SESClient({
@@ -23,21 +24,50 @@ export const runtime = 'nodejs';
 /** ★ ついでに SSG 判定も避ける */
 export const dynamic = 'force-dynamic';
 
+// カスタムアダプターの作成
+const customPrismaAdapter = {
+  ...PrismaAdapter(prisma),
+  getUserByAccount: async (account: {
+    provider: string;
+    providerAccountId: string;
+  }): Promise<AdapterUser | null> => {
+    const user = await prisma.user.findFirst({
+      where: {
+        Account: {
+          some: {
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        emailVerified: true,
+      },
+    });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      name: user.name || null,
+      email: user.email || '',
+      image: user.image || null,
+      emailVerified: user.emailVerified,
+    };
+  },
+} as Adapter;
+
 /** 設定は変数に切り出して、getServerSession でも再利用できるよう export しておく */
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: customPrismaAdapter,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      profile(profile) {
-        return {
-          id: profile.sub,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture,
-        };
-      },
     }),
     EmailProvider({
       from: process.env.AWS_SES_FROM_EMAIL,
@@ -140,7 +170,22 @@ export const authOptions: NextAuthOptions = {
         return prisma.user.upsert({
           where: { email },
           update: {},
-          create: { email },
+          create: {
+            email,
+            name: null,
+            image: null,
+            emailVerified: null,
+            isOnboarded: false,
+            stripeCustomerId: null,
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            emailVerified: true,
+            isOnboarded: true,
+          },
         });
       },
     }),
@@ -157,8 +202,43 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
         try {
-          // Google認証時のユーザー情報を確実に保存
-          await prisma.user.upsert({
+          // 既存のユーザーを検索
+          const existingUser = await prisma.user.findUnique({
+            where: { email: user.email! },
+            select: {
+              id: true,
+              Account: {
+                select: {
+                  provider: true,
+                },
+              },
+            },
+          });
+
+          // 既存のユーザーが存在し、かつGoogleアカウントがリンクされていない場合
+          if (
+            existingUser &&
+            !existingUser.Account.some((acc) => acc.provider === 'google')
+          ) {
+            // 既存のユーザーにGoogleアカウントをリンク
+            await prisma.account.create({
+              data: {
+                userId: existingUser.id,
+                type: account.type,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+                access_token: account.access_token,
+                expires_at: account.expires_at,
+                token_type: account.token_type,
+                scope: account.scope,
+                id_token: account.id_token,
+                session_state: account.session_state,
+              },
+            });
+          }
+
+          // 新規ユーザーの作成または既存ユーザーの更新
+          const dbUser = await prisma.user.upsert({
             where: { email: user.email! },
             update: {
               name: user.name,
@@ -170,8 +250,43 @@ export const authOptions: NextAuthOptions = {
               name: user.name,
               image: user.image,
               emailVerified: new Date(),
+              isOnboarded: false,
+              stripeCustomerId: null,
+            },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              image: true,
+              emailVerified: true,
+              isOnboarded: true,
             },
           });
+
+          // 新規ユーザーの場合、Freeプランを設定
+          if (!existingUser) {
+            await prisma.subscription.create({
+              data: {
+                userId: dbUser.id,
+                plan: 'FREE',
+                status: 'ACTIVE',
+                stripeSubscriptionId: null,
+                stripePriceId: null,
+                stripeCurrentPeriodEnd: null,
+              },
+            });
+
+            // 今月のAI使用制限を設定
+            const now = new Date();
+            await prisma.aiGenerationLimit.create({
+              data: {
+                userId: dbUser.id,
+                month: new Date(now.getFullYear(), now.getMonth(), 1),
+                count: 0,
+              },
+            });
+          }
+
           return true;
         } catch (error) {
           console.error('Error in signIn callback:', error);
@@ -183,14 +298,28 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub!;
-        // セッションにユーザー情報を追加
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.sub! },
-        });
-        if (dbUser) {
-          session.user.name = dbUser.name;
-          session.user.email = dbUser.email;
-          session.user.image = dbUser.image;
+        try {
+          // セッションにユーザー情報を追加
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.sub! },
+            select: {
+              name: true,
+              email: true,
+              image: true,
+              isOnboarded: true,
+            },
+          });
+
+          if (dbUser) {
+            session.user.name = dbUser.name;
+            session.user.email = dbUser.email;
+            session.user.image = dbUser.image;
+            session.user.isOnboarded = dbUser.isOnboarded;
+          } else {
+            console.error('User not found in database:', token.sub);
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
         }
       }
       return session;

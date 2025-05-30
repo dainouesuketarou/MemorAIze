@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, AiGenerationLimit } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { nanoid } from 'nanoid';
 
 const prisma = new PrismaClient();
-const MONTHLY_LIMIT = 5;
+const FREE_PLAN_MONTHLY_LIMIT = 5;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -110,33 +110,49 @@ export async function POST(req: Request) {
       );
     }
 
-    // 月間生成回数をチェック
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const generationLimit = await prisma.aiGenerationLimit.upsert({
-      where: {
-        userId_month: {
-          userId: session.user.id,
-          month: startOfMonth,
-        },
-      },
-      update: {},
-      create: {
-        userId: session.user.id,
-        month: startOfMonth,
-        count: 0,
-      },
+    // ユーザーのサブスクリプション情報を取得
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { subscription: true },
     });
 
-    if (generationLimit.count >= MONTHLY_LIMIT) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '今月のAI生成回数の上限に達しました。来月までお待ちください。',
+    const isProUser =
+      user?.subscription?.plan === 'PRO_MONTHLY' ||
+      user?.subscription?.plan === 'PRO_YEARLY';
+    let generationLimit: AiGenerationLimit | undefined;
+
+    // Freeプランの場合のみ制限をチェック
+    if (!isProUser) {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      generationLimit = await prisma.aiGenerationLimit.upsert({
+        where: {
+          userId_month: {
+            userId: session.user.id,
+            month: startOfMonth,
+          },
         },
-        { status: 429 },
-      );
+        update: {},
+        create: {
+          userId: session.user.id,
+          month: startOfMonth,
+          count: 0,
+        },
+      });
+
+      if (generationLimit.count >= FREE_PLAN_MONTHLY_LIMIT) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: '今月のAI生成回数の上限に達しました。',
+            limit: FREE_PLAN_MONTHLY_LIMIT,
+            currentCount: generationLimit.count,
+            isProUser: false,
+          },
+          { status: 429 },
+        );
+      }
     }
 
     const body = await req.json();
@@ -229,17 +245,19 @@ export async function POST(req: Request) {
         //   });
         // }
 
-        // AI生成回数を更新
-        await tx.aiGenerationLimit.update({
-          where: {
-            id: generationLimit.id,
-          },
-          data: {
-            count: {
-              increment: 1,
+        // AI生成回数を更新（Freeプランの場合のみ）
+        if (!isProUser && generationLimit) {
+          await tx.aiGenerationLimit.update({
+            where: {
+              id: generationLimit.id,
             },
-          },
-        });
+            data: {
+              count: {
+                increment: 1,
+              },
+            },
+          });
+        }
 
         return cards;
       });

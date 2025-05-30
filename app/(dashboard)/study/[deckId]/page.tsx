@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/dashboard/shell';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,18 @@ type CardType = {
   status: 'UNLEARNED' | 'MASTERED' | 'STRUGGLING';
   favorite: boolean;
 };
+
+type DragState = {
+  isDragging: boolean;
+  direction: 'left' | 'right' | null;
+  offset: number;
+};
+
+type TouchPosition = {
+  clientX: number;
+  clientY: number;
+};
+
 /* ============================ */
 export default function StudyPage() {
   const { deckId } = useParams();
@@ -59,6 +71,14 @@ export default function StudyPage() {
     STRUGGLING: 0,
     FAVORITE: 0,
   });
+
+  const [dragState, setDragState] = useState<DragState>({
+    isDragging: false,
+    direction: null,
+    offset: 0,
+  });
+  const dragTimeoutRef = useRef<NodeJS.Timeout>();
+  const touchStartPosRef = useRef<TouchPosition | null>(null);
 
   /* ============ 初期取得 ============ */
   useEffect(() => {
@@ -248,13 +268,72 @@ export default function StudyPage() {
   };
 
   /* ============ ドラッグ ============ */
-  const handleCardDrag = (e: React.DragEvent) => {
-    if (e.clientX < window.innerWidth / 2) {
-      handleIncorrect();
-    } else {
-      handleCorrect();
+  const handleDragStart = useCallback((clientX: number) => {
+    touchStartPosRef.current = { clientX, clientY: 0 };
+    setDragState({ isDragging: true, direction: null, offset: 0 });
+  }, []);
+
+  const handleDrag = useCallback(
+    (clientX: number) => {
+      if (!dragState.isDragging || !touchStartPosRef.current) return;
+
+      const offset = clientX - touchStartPosRef.current.clientX;
+      const direction = offset < 0 ? 'left' : 'right';
+
+      // 状態更新をスロットリング
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+      }
+
+      dragTimeoutRef.current = setTimeout(() => {
+        setDragState((prev) => ({
+          ...prev,
+          direction,
+          offset: Math.min(Math.max(offset, -100), 100),
+        }));
+      }, 16); // 約60fps
+    },
+    [dragState.isDragging],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    if (!dragState.isDragging) return;
+
+    // タイムアウトをクリア
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
     }
-  };
+
+    const threshold = 100;
+    if (Math.abs(dragState.offset) > threshold) {
+      if (dragState.direction === 'left') {
+        handleIncorrect();
+      } else {
+        handleCorrect();
+      }
+    }
+
+    // アニメーション用の状態をリセット
+    requestAnimationFrame(() => {
+      setDragState({ isDragging: false, direction: null, offset: 0 });
+      touchStartPosRef.current = null;
+    });
+  }, [
+    dragState.isDragging,
+    dragState.direction,
+    dragState.offset,
+    handleIncorrect,
+    handleCorrect,
+  ]);
+
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+      }
+    };
+  }, []);
 
   /* ============ ローディング / 0枚 ============ */
   if (loading)
@@ -297,30 +376,30 @@ export default function StudyPage() {
       groupMode={groupMode}
       setGroupMode={setGroupMode}
     >
-      {/* 進捗＋設定ボタンは絶対イジらない */}
-
-      <div className="w-full mb-8">
-        <div className="flex justify-between items-center mb-2">
+      {/* ヘッダー部分 */}
+      <div className="w-full mb-4 sm:mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
           <div className="flex items-center gap-2">
-            <Star className="h-5 w-5 text-primary" />
-            <span className="font-medium">{currentIndex}</span>
+            <span className="font-medium">{currentIndex + 1}</span>
             <span className="text-muted-foreground">/</span>
             <span className="text-muted-foreground">{totalCards}</span>
           </div>
-          <Button
-            onClick={() => setSettingOpen(true)}
-            variant="ghost"
-            size="icon"
-          >
-            <Cog className="h-6 w-6" />
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push('/dashboard')}
-            className="rounded-full px-6"
-          >
-            終了
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setSettingOpen(true)}
+              variant="ghost"
+              size="icon"
+            >
+              <Cog className="h-6 w-6" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dashboard')}
+              className="rounded-full px-4 sm:px-6"
+            >
+              終了
+            </Button>
+          </div>
         </div>
         <div className="h-2 rounded-full overflow-hidden bg-muted">
           <div
@@ -330,13 +409,14 @@ export default function StudyPage() {
         </div>
       </div>
 
+      {/* カード部分 */}
       <div className="w-full relative">
-        <div className="grid grid-cols-[120px_1fr_120px] gap-4 h-[500px]">
-          {/* 左ボタン */}
+        <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr_120px] gap-4 min-h-[400px] sm:h-[500px]">
+          {/* PC表示時の左ボタン */}
           <Button
             variant="ghost"
             className={cn(
-              'h-full writing-mode-vertical rounded-xl font-bold text-lg',
+              'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
               showAnswer
                 ? 'bg-red-500 hover:bg-red-600 text-white'
                 : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
@@ -347,36 +427,70 @@ export default function StudyPage() {
           </Button>
 
           {/* カード */}
-          <Card
-            className="relative flex items-center justify-center p-8 cursor-pointer select-none"
-            onClick={() => setShowAnswer((p) => !p)}
-            draggable
-            onDragEnd={handleCardDrag}
+          <div
+            className="relative flex-1"
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              handleDragStart(touch.clientX);
+            }}
+            onTouchMove={(e) => {
+              const touch = e.touches[0];
+              handleDrag(touch.clientX);
+            }}
+            onTouchEnd={() => handleDragEnd()}
           >
-            <div className="absolute top-4 right-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  console.log('[UI] Volume button clicked');
-                  speakFrontOrBack(currentCard, showAnswer, setting?.reverse);
-                }}
-              >
-                <Volume2 className="h-6 w-6" />
-              </Button>
-            </div>
-            <div className="text-4xl font-bold text-center break-words">
-              {showAnswer ? back : front}
-            </div>
-          </Card>
+            <Card
+              className={cn(
+                'relative flex items-center justify-center p-4 sm:p-8 cursor-grab select-none min-h-[300px] sm:min-h-[500px] transition-transform duration-200 touch-none',
+                dragState.isDragging && 'cursor-grabbing',
+                dragState.direction === 'left' && 'rotate-[-5deg]',
+                dragState.direction === 'right' && 'rotate-[5deg]',
+              )}
+              style={{
+                transform: dragState.isDragging
+                  ? `translateX(${dragState.offset}px)`
+                  : 'translateX(0)',
+                touchAction: 'none',
+              }}
+              onClick={() => setShowAnswer((p) => !p)}
+            >
+              {/* ドラッグ中の方向インジケーター */}
+              {dragState.isDragging && (
+                <div
+                  className={cn(
+                    'absolute inset-0 rounded-lg transition-opacity duration-200',
+                    dragState.direction === 'left'
+                      ? 'bg-red-500/20'
+                      : dragState.direction === 'right'
+                      ? 'bg-green-500/20'
+                      : 'bg-transparent',
+                  )}
+                />
+              )}
+              <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    speakFrontOrBack(currentCard, showAnswer, setting?.reverse);
+                  }}
+                >
+                  <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                </Button>
+              </div>
+              <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4">
+                {showAnswer ? back : front}
+              </div>
+            </Card>
+          </div>
 
-          {/* 右ボタン */}
+          {/* PC表示時の右ボタン */}
           <Button
             variant="ghost"
             className={cn(
-              'h-full writing-mode-vertical rounded-xl font-bold text-lg',
+              'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
               showAnswer
                 ? 'bg-green-500 hover:bg-green-600 text-white'
                 : 'bg-blue-500 hover:bg-blue-600 text-white',
@@ -387,12 +501,42 @@ export default function StudyPage() {
           </Button>
         </div>
 
-        {/* 戻る／進む */}
-        <div className="flex justify-between mt-8">
+        {/* スマホ表示時のボタン */}
+        <div className="sm:hidden flex flex-col gap-4 mt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Button
+              variant="ghost"
+              className={cn(
+                'h-12 rounded-xl font-bold text-lg',
+                showAnswer
+                  ? 'bg-red-500 hover:bg-red-600 text-white'
+                  : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
+              )}
+              onClick={handleIncorrect}
+            >
+              {showAnswer ? '不正解' : '分からない'}
+            </Button>
+            <Button
+              variant="ghost"
+              className={cn(
+                'h-12 rounded-xl font-bold text-lg',
+                showAnswer
+                  ? 'bg-green-500 hover:bg-green-600 text-white'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white',
+              )}
+              onClick={showAnswer ? handleCorrect : () => setShowAnswer(true)}
+            >
+              {showAnswer ? '正解' : '答え'}
+            </Button>
+          </div>
+        </div>
+
+        {/* 戻る／進むボタン */}
+        <div className="flex justify-between mt-4 sm:mt-8 px-2 sm:px-0">
           <Button
             variant="outline"
             size="lg"
-            className="w-32 rounded-full"
+            className="w-28 sm:w-32 rounded-full"
             onClick={prev}
             disabled={currentIndex === 0}
           >
@@ -401,7 +545,7 @@ export default function StudyPage() {
           <Button
             variant="outline"
             size="lg"
-            className="w-32 rounded-full"
+            className="w-28 sm:w-32 rounded-full"
             onClick={() => {
               if (currentIndex >= totalCards - 1) {
                 handleNext(undefined);

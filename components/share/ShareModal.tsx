@@ -2,7 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { DeckCard } from './DeckCard';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { Trash2 } from 'lucide-react';
+import { Sparkles, Trash2 } from 'lucide-react';
+import { ImportDeckButton } from '../deck/ImportDeckButton';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import { Subscription } from '@prisma/client';
+import { setSubscription } from '@/lib/store/slices/userSlice';
+import { Button } from '../ui/button';
 
 interface Deck {
   id: string;
@@ -27,6 +33,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
   const [importLoading, setImportLoading] = useState<string | null>(null);
   const router = useRouter();
 
+  const subscription = useSelector(
+    (state: RootState) => state.user.subscription,
+  );
+  const dispatch = useDispatch();
+
   useEffect(() => {
     if (!open) return;
     setLoading(true);
@@ -42,7 +53,27 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
       });
     setImportedDecks([]);
     setImportCode('');
-  }, [open]);
+
+    const fetchSubscription = async () => {
+      try {
+        // サブスクリプション情報を取得
+        const subscriptionResponse = await fetch('/api/subscription/status');
+        if (!subscriptionResponse.ok) {
+          throw new Error('サブスクリプション情報の取得に失敗しました');
+        }
+
+        const subscriptionData: Subscription =
+          await subscriptionResponse.json();
+
+        // Reduxの状態を更新
+        dispatch(setSubscription(subscriptionData));
+      } catch (error) {
+        console.error('サブスクリプション情報の取得に失敗しました:', error);
+      }
+    };
+
+    fetchSubscription();
+  }, [open, dispatch]);
 
   const handleImport = async () => {
     if (!importCode.trim()) {
@@ -137,13 +168,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
                 onChange={(e) => setImportCode(e.target.value)}
                 disabled={importing}
               />
-              <button
-                className="bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded transition-all disabled:opacity-50 w-full sm:w-auto"
-                onClick={handleImport}
-                disabled={importing}
-              >
-                {importing ? 'インポート中...' : 'インポート'}
-              </button>
+              {subscription?.plan === 'FREE' ? (
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/subscription')}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>アップグレードしてインポート</span>
+                </Button>
+              ) : (
+                <ImportDeckButton onImport={handleImport} />
+              )}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">

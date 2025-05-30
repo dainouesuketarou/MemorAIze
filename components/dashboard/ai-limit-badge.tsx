@@ -1,9 +1,16 @@
 'use client';
 
-import { AlertCircle, Brain, LoaderCircle } from 'lucide-react';
+import { AlertCircle, Brain, LoaderCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAiGenerationLimit } from '@/hooks/use-ai-generation-limit';
 import { Card, CardContent } from '../ui/card';
+import { Button } from '../ui/button';
+import Link from 'next/link';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import { useEffect, useState } from 'react';
+import { Subscription } from '@prisma/client';
+import { setSubscription } from '@/lib/store/slices/userSlice';
 
 /**
  * ヘッダー用のコンパクト表示
@@ -11,42 +18,114 @@ import { Card, CardContent } from '../ui/card';
  */
 export function AiLimitBadge({ className }: { className?: string }) {
   const { limit, loading } = useAiGenerationLimit();
+  const subscription = useSelector(
+    (state: RootState) => state.user.subscription,
+  );
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        // サブスクリプション情報を取得
+        const subscriptionResponse = await fetch('/api/subscription/status');
+        if (!subscriptionResponse.ok) {
+          throw new Error('サブスクリプション情報の取得に失敗しました');
+        }
+
+        const subscriptionData: Subscription =
+          await subscriptionResponse.json();
+
+        // Reduxの状態を更新
+        dispatch(setSubscription(subscriptionData));
+      } catch (error) {
+        console.error('サブスクリプション情報の取得に失敗しました:', error);
+      }
+    };
+
+    fetchSubscription();
+  }, []);
+  const isProUser =
+    subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';
 
   if (loading) {
     return (
-        <Card className="mb-4">
-            <CardContent className="p-4">
-            <div
-                className={cn(
-          'flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md',
-          className,
-        )}
-      >
-        <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
-        <span className="text-sm font-medium">読み込み中...</span>
-      </div>
-            </CardContent>
-        </Card>
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md',
+              className,
+            )}
+          >
+            <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-sm font-medium">読み込み中...</span>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!limit) return null;
 
+  const isNearLimit = limit.count >= limit.limit * 0.8; // 80%以上使用で警告表示
+
   return (
     <Card className="mb-4">
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
-            <div>
-              <p className="text-sm font-medium">
-                今月のAI生成回数: {limit.count}/{limit.limit}回
-              </p>
-              <p className="text-sm text-muted-foreground">
-                残り{limit.limit - limit.count}回生成できます
-              </p>
+      <CardContent className="p-4">
+        {isProUser ? (
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div>
+                  <p className="text-sm font-medium text-purple-600">
+                    Proプラン: AI生成機能が無制限で利用可能
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    いつでもAI機能をお使いいただけます
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </CardContent>
+        ) : (
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle
+                  className={cn(
+                    'h-5 w-5',
+                    isNearLimit ? 'text-red-500' : 'text-yellow-600',
+                  )}
+                />
+                <div>
+                  <p className="text-sm font-medium">
+                    今月のAI生成回数: {limit.count}/{limit.limit}回
+                  </p>
+                  <p
+                    className={cn(
+                      'text-sm',
+                      isNearLimit ? 'text-red-500' : 'text-muted-foreground',
+                    )}
+                  >
+                    残り{limit.limit - limit.count}回生成できます
+                  </p>
+                </div>
+              </div>
+              <Button asChild variant="default" className="gap-2">
+                <Link href="/subscription">
+                  <Sparkles className="h-4 w-4" />
+                  アップグレード
+                </Link>
+              </Button>
+            </div>
+            {isNearLimit && (
+              <div className="text-sm text-red-500 bg-red-50 p-3 rounded-md">
+                AI生成回数が残りわずかです。Proプランにアップグレードして、無制限にAI機能をお使いください。
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }

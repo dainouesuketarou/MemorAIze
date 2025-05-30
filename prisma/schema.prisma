@@ -81,6 +81,24 @@ model StudyHistory {
     createdAt DateTime @default(now())
 }
 
+enum StudyPurpose {
+  QUALIFICATION // 資格対策
+  SCHOOL_EXAM // 学校の試験対策
+  QUIZ_TRAINING // クイズトレーニング
+  LANGUAGE_LEARNING // 語学学習
+  OTHER // その他
+}
+
+model UserStudyPurpose {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   StudyPurpose
+  createdAt DateTime @default(now())
+
+  @@unique([userId, purpose])
+}
+
 model User {
     id            String    @id @default(uuid())
     email         String    @unique
@@ -95,6 +113,10 @@ model User {
     Account       Account[]
     Session       Session[]
     loginHistory  LoginHistory[]
+    subscription  Subscription?
+    stripeCustomerId String? @unique
+    studyPurposes UserStudyPurpose[]
+    isOnboarded   Boolean   @default(false)
 }
 
 model Account {
@@ -151,4 +173,32 @@ model LoginHistory {
     createdAt DateTime @default(now())
 
     @@index([userId, loginAt])
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO_MONTHLY
+  PRO_YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+  TRIALING
+}
+
+model Subscription {
+    id                    String   @id @default(cuid())
+    userId               String   @unique
+    user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    stripeSubscriptionId String?  @unique
+    stripePriceId        String?
+    stripeCurrentPeriodEnd DateTime?
+    plan                 SubscriptionPlan @default(FREE)
+    status               SubscriptionStatus @default(ACTIVE)
+    createdAt            DateTime @default(now())
+    updatedAt            DateTime @updatedAt
+    cancelAtPeriodEnd    Boolean @default(false)
 }
