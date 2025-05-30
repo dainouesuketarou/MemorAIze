@@ -143,12 +143,31 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<any>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
   }, [status, router]);
+
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        const response = await fetch('/api/subscription');
+        if (response.ok) {
+          const data = await response.json();
+          setSubscription(data);
+        }
+      } catch (error) {
+        console.error('サブスクリプション情報の取得に失敗しました:', error);
+      }
+    };
+
+    if (session?.user) {
+      fetchSubscription();
+    }
+  }, [session]);
 
   const handleUpgrade = async (planId: string) => {
     if (!session?.user) {
@@ -160,6 +179,12 @@ export default function SubscriptionPage() {
     const plan = plans.find((p) => p.id === planId);
     if (!plan) {
       toast.error('無効なプランです');
+      return;
+    }
+
+    // 現在のプランと同じ場合は何もしない
+    if (subscription?.plan === plan.stripePriceId) {
+      toast.info('現在のプランと同じです');
       return;
     }
 
@@ -193,6 +218,20 @@ export default function SubscriptionPage() {
     }
   };
 
+  const getCurrentPlan = () => {
+    if (!subscription) return 'free';
+    switch (subscription.plan) {
+      case STRIPE_PRICE_IDS.PRO_MONTHLY:
+        return 'pro-monthly';
+      case STRIPE_PRICE_IDS.PRO_YEARLY:
+        return 'pro-yearly';
+      default:
+        return 'free';
+    }
+  };
+
+  const currentPlanId = getCurrentPlan();
+
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -223,63 +262,87 @@ export default function SubscriptionPage() {
         <p className="text-xl text-muted-foreground">
           あなたの学習をサポートする最適なプランをお選びください
         </p>
+        {subscription && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            現在のプラン: {plans.find((p) => p.id === currentPlanId)?.name}
+            {subscription.stripeCurrentPeriodEnd && (
+              <span className="ml-2">
+                (次回更新日:{' '}
+                {new Date(
+                  subscription.stripeCurrentPeriodEnd,
+                ).toLocaleDateString('ja-JP')}
+                )
+              </span>
+            )}
+          </p>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-8">
-        {plans.map((plan) => (
-          <Card
-            key={plan.id}
-            className={cn(
-              'flex flex-col',
-              plan.isPopular && 'border-primary shadow-lg',
-            )}
-          >
-            <CardHeader>
-              <CardTitle className="text-2xl">{plan.name}</CardTitle>
-              <CardDescription>{plan.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              <div className="mb-6">
-                <span className="text-4xl font-bold">
-                  ¥{plan.price.toLocaleString()}
-                </span>
-                <span className="text-muted-foreground">
-                  /{plan.interval === 'month' ? '月' : '年'}
-                </span>
-              </div>
-              <ul className="space-y-3">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-center">
-                    <Check className="h-5 w-5 text-primary mr-2" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full gap-2"
-                variant={plan.isPopular ? 'default' : 'outline'}
-                onClick={() => handleUpgrade(plan.id)}
-                disabled={loading === plan.id}
-              >
-                {loading === plan.id ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                    処理中...
-                  </>
-                ) : plan.id === 'free' ? (
-                  '現在のプラン'
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    アップグレード
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+        {plans.map((plan) => {
+          const isCurrentPlan = plan.id === currentPlanId;
+          return (
+            <Card
+              key={plan.id}
+              className={cn(
+                'flex flex-col',
+                plan.isPopular && 'border-primary shadow-lg',
+                isCurrentPlan && 'border-2 border-primary',
+              )}
+            >
+              <CardHeader>
+                <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                <CardDescription>{plan.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <div className="mb-6">
+                  <span className="text-4xl font-bold">
+                    ¥{plan.price.toLocaleString()}
+                  </span>
+                  <span className="text-muted-foreground">
+                    /{plan.interval === 'month' ? '月' : '年'}
+                  </span>
+                </div>
+                <ul className="space-y-3">
+                  {plan.features.map((feature, index) => (
+                    <li key={index} className="flex items-center">
+                      <Check className="h-5 w-5 text-primary mr-2" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  className="w-full gap-2"
+                  variant={
+                    isCurrentPlan
+                      ? 'default'
+                      : plan.isPopular
+                      ? 'default'
+                      : 'outline'
+                  }
+                  onClick={() => handleUpgrade(plan.id)}
+                  disabled={loading === plan.id || isCurrentPlan}
+                >
+                  {loading === plan.id ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                      処理中...
+                    </>
+                  ) : isCurrentPlan ? (
+                    '現在のプラン'
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      アップグレード
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+          );
+        })}
       </div>
 
       {clientSecret && selectedPlanId && (

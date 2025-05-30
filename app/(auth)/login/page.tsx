@@ -39,12 +39,35 @@ const formSchema = z.object({
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+
+  // セッションの状態に基づいてリダイレクト
+  useEffect(() => {
+    const handleSession = async () => {
+      if (status === 'authenticated' && session?.user?.email) {
+        // ユーザー情報が完全に取得できていることを確認
+        const sessionData = await fetch('/api/auth/session').then((res) =>
+          res.json(),
+        );
+        if (sessionData?.user?.email) {
+          await checkOnboardingStatus();
+        }
+      }
+    };
+
+    handleSession();
+  }, [status, session]);
 
   const checkOnboardingStatus = async () => {
     try {
       const response = await fetch('/api/auth/onboarding/status');
       const data = await response.json();
+
+      // ログイン履歴を記録
+      await fetch('/api/auth/login-history', {
+        method: 'POST',
+      });
+
       if (!data.isOnboarded) {
         router.push('/onboarding');
       } else {
@@ -52,16 +75,9 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('オンボーディング状態の確認に失敗しました:', error);
-      router.push('/dashboard'); // エラー時はダッシュボードにフォールバック
+      router.push('/dashboard');
     }
   };
-
-  // セッションが存在する場合のオンボーディングチェック
-  useEffect(() => {
-    if (session?.user?.email) {
-      checkOnboardingStatus();
-    }
-  }, [session]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -99,14 +115,48 @@ export default function LoginPage() {
       if (result?.error) {
         throw new Error(result.error);
       }
-      // Googleログイン成功後、オンボーディング状態をチェック
-      await checkOnboardingStatus();
+
+      // ユーザー情報の取得を待機
+      let retryCount = 0;
+      const maxRetries = 5;
+
+      while (retryCount < maxRetries) {
+        const session = await fetch('/api/auth/session').then((res) =>
+          res.json(),
+        );
+        if (session?.user?.email) {
+          // ユーザー情報が取得できたらオンボーディング状態をチェック
+          await checkOnboardingStatus();
+          break;
+        }
+        // 500ms待機してから再試行
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        retryCount++;
+      }
+
+      if (retryCount === maxRetries) {
+        throw new Error(
+          'ユーザー情報の取得に時間がかかっています。ページを更新してください。',
+        );
+      }
     } catch (error) {
-      toast.error('エラーが発生しました');
+      toast.error(
+        error instanceof Error ? error.message : 'エラーが発生しました',
+      );
     } finally {
       setIsLoading(false);
     }
   };
+
+  // ローディング中は何も表示しない
+  if (status === 'loading') {
+    return null;
+  }
+
+  // すでに認証済みの場合は何も表示しない
+  if (status === 'authenticated') {
+    return null;
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full px-4 sm:px-8">

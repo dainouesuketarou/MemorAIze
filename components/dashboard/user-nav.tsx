@@ -72,7 +72,7 @@ export function UserNav() {
               <User className="mr-2 h-4 w-4" />
               <span>プロフィール</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/billing')}>
               <CreditCard className="mr-2 h-4 w-4" />
               <span>課金情報</span>
             </DropdownMenuItem>

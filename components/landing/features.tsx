@@ -1,12 +1,10 @@
 import {
-  CircleCheck,
   File as FilePdf,
-  FileText,
   Image,
   LightbulbIcon,
   BarChart3,
   Share2,
-  IterationCcw,
+  FolderTree,
 } from 'lucide-react';
 
 export function LandingFeatures() {
@@ -15,37 +13,37 @@ export function LandingFeatures() {
       icon: FilePdf,
       title: 'PDFからカード作成',
       description:
-        '教科書やノートをアップロードするだけでAIが自動的に最適な暗記カードを生成します。',
+        '教科書やノートのPDFをアップロードするだけで、AIが自動的に最適な暗記カードを生成します。',
     },
     {
       icon: Image,
-      title: '画像認識',
+      title: '画像からカード作成',
       description:
-        '手書きノートや教科書の写真からテキストを抽出し、暗記カードに変換します。',
+        '手書きノートや教科書の写真をアップロードして、AIがテキストを認識し暗記カードに変換します。',
     },
     {
       icon: LightbulbIcon,
-      title: 'AIによる最適化',
+      title: 'AIによるカード最適化',
       description:
-        'あなたの学習パターンを分析し、知識の定着に最も効果的な復習タイミングを提案します。',
+        'AIが生成したカードに対して追加指示を与えることで、より効果的な暗記カードに最適化できます。',
     },
     {
       icon: BarChart3,
-      title: '学習進捗の可視化',
+      title: '暗記推移の可視化',
       description:
-        '学習進捗をグラフで可視化し、得意分野と苦手分野を一目で把握できます。',
+        '暗記カードの習得状況をグラフで可視化し、学習の進捗を一目で確認できます。',
     },
     {
-      icon: IterationCcw,
-      title: '間隔反復学習',
+      icon: FolderTree,
+      title: 'カスタムグループ化',
       description:
-        '科学的に実証された間隔反復学習法に基づき、効率的な復習スケジュールを提案します。',
+        'ユーザーの好みに合わせて暗記帳をグループ化し、効率的に整理・管理できます。',
     },
     {
       icon: Share2,
-      title: 'カード共有',
+      title: '暗記帳のインポート',
       description:
-        '作成した暗記カードをクラスメイトや友人と簡単に共有できます。',
+        '他のユーザーが作成した暗記帳を自分のアカウントにインポートして、すぐに学習を始めることができます。',
     },
   ];
 
@@ -65,10 +63,10 @@ export function LandingFeatures() {
               id="features-heading"
               className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl"
             >
-              AIでもっと効率的に暗記
+              AIで効率的な暗記学習を
             </h2>
             <p className="max-w-[700px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-              MemorAIzeのAI機能で暗記学習を最適化。あなたの学習スタイルに合わせてカスタマイズできます。
+              MemorAIzeのAI機能で暗記学習を効率化。PDFや画像から簡単に暗記カードを作成し、学習をサポートします。
             </p>
           </div>
         </div>

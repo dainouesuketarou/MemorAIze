@@ -49,7 +49,7 @@ export function LandingPricing() {
               <ul className="space-y-2 text-sm">
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>基本的なフラッシュカード作成</span>
+                  <span>基本的な暗記帳機能</span>
                 </li>
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
@@ -57,11 +57,11 @@ export function LandingPricing() {
                 </li>
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>最大10枚のカード/デッキ</span>
+                  <span>暗記推移の可視化</span>
                 </li>
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>作成したカードの閲覧・学習</span>
+                  <span>カスタムグループ化</span>
                 </li>
               </ul>
             </CardContent>
@@ -85,31 +85,23 @@ export function LandingPricing() {
               <ul className="space-y-2 text-sm">
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>無制限のフラッシュカード作成</span>
+                  <span>無料プランの全機能</span>
                 </li>
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>月30回までのAI生成</span>
+                  <span>無制限のAI生成</span>
+                </li>
+                <li className="flex items-center">
+                  <Check className="mr-2 h-4 w-4 text-primary" />
+                  <span>暗記帳のインポート機能</span>
                 </li>
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
                   <span>広告なしの快適な環境</span>
                 </li>
-                <li className="flex items-center">
-                  <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>学習カードのグループ化と共有</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>AIベースの詳細な学習分析</span>
-                </li>
               </ul>
             </CardContent>
-            <CardFooter>
-              <Link href="/subscribe" className="w-full">
-                <Button className="w-full bg-primary">登録する</Button>
-              </Link>
-            </CardFooter>
+            <CardFooter></CardFooter>
           </Card>
           <Card className="flex flex-col justify-between">
             <CardHeader>
@@ -133,23 +125,11 @@ export function LandingPricing() {
                 </li>
                 <li className="flex items-center">
                   <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>月50回までのAI生成</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>優先サポート</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="mr-2 h-4 w-4 text-primary" />
-                  <span>新機能の優先アクセス</span>
+                  <span>年間契約によるお得な料金</span>
                 </li>
               </ul>
             </CardContent>
-            <CardFooter>
-              <Link href="/subscribe" className="w-full">
-                <Button className="w-full bg-primary">登録する</Button>
-              </Link>
-            </CardFooter>
+            <CardFooter></CardFooter>
           </Card>
         </div>
       </div>

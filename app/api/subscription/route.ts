@@ -6,6 +6,7 @@ import { stripe, STRIPE_PRICE_IDS } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 import StripeType from 'stripe';
+import { getAuthSession } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
@@ -332,5 +333,45 @@ export async function POST(req: Request) {
       );
     }
     return new NextResponse(errorMessage, { status: 500 });
+  }
+}
+
+export async function GET() {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: {
+        subscription: {
+          select: {
+            id: true,
+            plan: true,
+            status: true,
+            stripeSubscriptionId: true,
+            stripePriceId: true,
+            stripeCurrentPeriodEnd: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'ユーザーが見つかりません' },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(user.subscription);
+  } catch (error) {
+    console.error('サブスクリプション情報の取得に失敗しました:', error);
+    return NextResponse.json(
+      { error: 'サブスクリプション情報の取得に失敗しました' },
+      { status: 500 },
+    );
   }
 }
