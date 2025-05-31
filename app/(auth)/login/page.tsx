@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -41,24 +41,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  // セッションの状態に基づいてリダイレクト
-  useEffect(() => {
-    const handleSession = async () => {
-      if (status === 'authenticated' && session?.user?.email) {
-        // ユーザー情報が完全に取得できていることを確認
-        const sessionData = await fetch('/api/auth/session').then((res) =>
-          res.json(),
-        );
-        if (sessionData?.user?.email) {
-          await checkOnboardingStatus();
-        }
-      }
-    };
-
-    handleSession();
-  }, [status, session]);
-
-  const checkOnboardingStatus = async () => {
+  const checkOnboardingStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/onboarding/status');
       const data = await response.json();
@@ -77,7 +60,24 @@ export default function LoginPage() {
       console.error('オンボーディング状態の確認に失敗しました:', error);
       router.push('/dashboard');
     }
-  };
+  }, [router]);
+
+  // セッションの状態に基づいてリダイレクト
+  useEffect(() => {
+    const handleSession = async () => {
+      if (status === 'authenticated' && session?.user?.email) {
+        // ユーザー情報が完全に取得できていることを確認
+        const sessionData = await fetch('/api/auth/session').then((res) =>
+          res.json(),
+        );
+        if (sessionData?.user?.email) {
+          await checkOnboardingStatus();
+        }
+      }
+    };
+
+    handleSession();
+  }, [status, session, checkOnboardingStatus]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
