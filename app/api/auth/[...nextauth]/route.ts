@@ -31,33 +31,38 @@ const customPrismaAdapter = {
     provider: string;
     providerAccountId: string;
   }): Promise<AdapterUser | null> => {
-    const user = await prisma.user.findFirst({
-      where: {
-        Account: {
-          some: {
-            provider: account.provider,
-            providerAccountId: account.providerAccountId,
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          Account: {
+            some: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            },
           },
         },
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        emailVerified: true,
-      },
-    });
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          emailVerified: true,
+        },
+      });
 
-    if (!user) return null;
+      if (!user) return null;
 
-    return {
-      id: user.id,
-      name: user.name || null,
-      email: user.email || '',
-      image: user.image || null,
-      emailVerified: user.emailVerified,
-    };
+      return {
+        id: user.id,
+        name: user.name || null,
+        email: user.email || '',
+        image: user.image || null,
+        emailVerified: user.emailVerified,
+      };
+    } catch (error) {
+      console.error('Error in getUserByAccount:', error);
+      return null;
+    }
   },
 } as Adapter;
 
