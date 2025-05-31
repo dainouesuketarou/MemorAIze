@@ -23,10 +23,32 @@ export async function GET() {
 
   try {
     const aiLimit = await withPrisma(async (prisma) => {
-      return await prisma.aiGenerationLimit.upsert({
-        where: { userId_month: { userId, month: monthUtc } },
-        update: {},
-        create: { userId, month: monthUtc, count: 0 },
+      // 既存のレコードを検索
+      const existingLimit = await prisma.aiGenerationLimit.findFirst({
+        where: {
+          userId,
+          month: {
+            gte: monthUtc,
+            lt: new Date(
+              monthUtc.getUTCFullYear(),
+              monthUtc.getUTCMonth() + 1,
+              1,
+            ),
+          },
+        },
+      });
+
+      if (existingLimit) {
+        return existingLimit;
+      }
+
+      // 新規レコードを作成
+      return await prisma.aiGenerationLimit.create({
+        data: {
+          userId,
+          month: monthUtc,
+          count: 0,
+        },
       });
     });
 

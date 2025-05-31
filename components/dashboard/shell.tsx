@@ -1,7 +1,7 @@
 // components/dashboard/shell.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { MainNav } from '@/components/dashboard/main-nav';
 import { UserNav } from '@/components/dashboard/user-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -72,39 +72,136 @@ export function DashboardShell({
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // スクロールイベントの最適化
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll);
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setScrolled(window.scrollY > 10);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // AI生成制限の取得を最適化
   useEffect(() => {
+    const controller = new AbortController();
     const fetchLimit = async () => {
       try {
-        const response = await fetch('/api/ai-generation-limit');
+        const response = await fetch('/api/ai-generation-limit', {
+          signal: controller.signal,
+        });
         const data = await response.json();
         if (data.success) {
           setLimit(data.data);
         }
-      } catch (error) {
-        console.error('Error fetching AI generation limit:', error);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Error fetching AI generation limit:', error);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchLimit();
+    return () => controller.abort();
   }, []);
 
-  const filteredDecks = decks.filter((deck) =>
-    deck.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  // 検索結果のメモ化
+  const filteredDecks = useMemo(() => {
+    if (!searchQuery) return [];
+    const query = searchQuery.toLowerCase();
+    return decks.filter((deck) => deck.title.toLowerCase().includes(query));
+  }, [decks, searchQuery]);
+
+  // 検索ハンドラーの最適化
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setShowResults(!!value);
+  }, []);
+
+  const handleSelect = useCallback(
+    (deckId: string) => {
+      setSearchQuery('');
+      setShowResults(false);
+      router.push(`/deck/${deckId}`);
+    },
+    [router],
   );
 
-  const handleSelect = (deckId: string) => {
-    setSearchQuery('');
-    setShowResults(false);
-    router.push(`/deck/${deckId}`);
-  };
+  // 検索結果のレンダリングを最適化
+  const renderSearchResults = useMemo(() => {
+    if (!showResults || !searchQuery) return null;
+
+    return (
+      <div className="absolute w-full mt-1 bg-background border rounded-md shadow-lg max-h-[400px] overflow-y-auto z-50">
+        {filteredDecks.length > 0 ? (
+          <div className="py-1">
+            {filteredDecks.map((deck) => {
+              const totalCards = deck.cards.length;
+              const masteredCount = deck.cards.filter(
+                (card) => card.status === 'MASTERED',
+              ).length;
+              const progress =
+                totalCards > 0
+                  ? Math.round((masteredCount / totalCards) * 100)
+                  : 0;
+
+              return (
+                <button
+                  key={deck.id}
+                  onClick={() => handleSelect(deck.id)}
+                  className="w-full px-4 py-3 text-left hover:bg-muted transition-colors"
+                >
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{deck.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {totalCards}枚のカード
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <BookOpen className="h-3 w-3" />
+                        <span>
+                          {deck.groups.length > 0
+                            ? deck.groups.map((g) => g.name).join(', ')
+                            : 'グループなし'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {deck.lastStudied
+                            ? `最終学習: ${getRelativeTime(deck.lastStudied)}`
+                            : '未学習'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <BarChart className="h-3 w-3" />
+                        <span>進捗: {progress}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="px-4 py-2 text-sm text-muted-foreground">
+            検索結果が見つかりませんでした
+          </div>
+        )}
+      </div>
+    );
+  }, [filteredDecks, showResults, searchQuery, handleSelect]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -128,86 +225,17 @@ export function DashboardShell({
           <div className="flex-1 justify-center px-4 lg:px-8">
             <div className="relative w-full max-w-md">
               <div className="hidden lg:block relative">
-                <Search className=" absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="暗記カード帳を検索..."
                   className="w-full pl-9 bg-muted"
                   value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setShowResults(true);
-                  }}
+                  onChange={handleSearch}
                   onFocus={() => setShowResults(true)}
                 />
               </div>
-              {showResults && searchQuery && (
-                <div className="absolute w-full mt-1 bg-background border rounded-md shadow-lg max-h-[400px] overflow-y-auto z-50">
-                  {filteredDecks.length > 0 ? (
-                    <div className="py-1">
-                      {filteredDecks.map((deck) => {
-                        const totalCards = deck.cards.length;
-                        const masteredCount = deck.cards.filter(
-                          (card) => card.status === 'MASTERED',
-                        ).length;
-                        const progress =
-                          totalCards > 0
-                            ? Math.round((masteredCount / totalCards) * 100)
-                            : 0;
-
-                        return (
-                          <button
-                            key={deck.id}
-                            onClick={() => handleSelect(deck.id)}
-                            className="w-full px-4 py-3 text-left hover:bg-muted transition-colors"
-                          >
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium">
-                                  {deck.title}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {totalCards}枚のカード
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <BookOpen className="h-3 w-3" />
-                                  <span>
-                                    {deck.groups.length > 0
-                                      ? deck.groups
-                                          .map((g) => g.name)
-                                          .join(', ')
-                                      : 'グループなし'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  <span>
-                                    {deck.lastStudied
-                                      ? `最終学習: ${getRelativeTime(
-                                          deck.lastStudied,
-                                        )}`
-                                      : '未学習'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <BarChart className="h-3 w-3" />
-                                  <span>進捗: {progress}%</span>
-                                </div>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-2 text-sm text-muted-foreground">
-                      検索結果が見つかりませんでした
-                    </div>
-                  )}
-                </div>
-              )}
+              {renderSearchResults}
             </div>
           </div>
 
