@@ -13,6 +13,7 @@ import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 import { useSession } from 'next-auth/react';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { DeckFilter } from '@/components/dashboard/deck-filter';
+import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -32,33 +33,48 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    // デッキ一覧取得（cards／groups がない場合は空配列で初期化）
-    fetch('/api/decks')
-      .then((res) => res.json())
-      .then((data: Partial<DeckWithCardsAndGroups>[]) => {
+    const fetchDecks = async () => {
+      try {
+        const res = await fetch('/api/decks');
+        if (!res.ok) {
+          throw new Error('デッキ一覧の取得に失敗しました');
+        }
+        const data: Partial<DeckWithCardsAndGroups>[] = await res.json();
         const mapped = data.map((d) => ({
           ...d,
           cards: d.cards ?? [],
           groups: d.groups ?? [],
         })) as DeckWithCardsAndGroups[];
         setDecks(mapped);
-      })
-      .catch((e) => console.error('デッキ取得エラー:', e));
+      } catch (error) {
+        console.error('デッキ取得エラー:', error);
+        toast.error('デッキ一覧の取得に失敗しました');
+      }
+    };
+
+    fetchDecks();
   }, [session]);
 
   useEffect(() => {
-    const refresh = () =>
-      fetch('/api/decks')
-        .then((res) => res.json())
-        .then((data: Partial<DeckWithCardsAndGroups>[]) => {
-          const mapped = data.map((d) => ({
-            ...d,
-            cards: d.cards ?? [],
-            groups: d.groups ?? [],
-          })) as DeckWithCardsAndGroups[];
-          setDecks(mapped);
-        })
-        .catch((e) => console.error('デッキ取得エラー:', e)); // fetchDecksはデッキ一覧を再取得する関数
+    const refresh = async () => {
+      try {
+        const res = await fetch('/api/decks');
+        if (!res.ok) {
+          throw new Error('デッキ一覧の取得に失敗しました');
+        }
+        const data: Partial<DeckWithCardsAndGroups>[] = await res.json();
+        const mapped = data.map((d) => ({
+          ...d,
+          cards: d.cards ?? [],
+          groups: d.groups ?? [],
+        })) as DeckWithCardsAndGroups[];
+        setDecks(mapped);
+      } catch (error) {
+        console.error('デッキ取得エラー:', error);
+        toast.error('デッキ一覧の取得に失敗しました');
+      }
+    };
+
     window.addEventListener('refreshDecks', refresh);
     return () => window.removeEventListener('refreshDecks', refresh);
   }, []);

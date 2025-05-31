@@ -81,29 +81,46 @@ export function DeckList({
 
   // モーダル内での分野付け替え
   const toggleDeckGroup = async (deckId: string, groupId: string) => {
-    // 変更後のグループID配列を作成
-    const targetDeck = localDecks.find((d) => d.id === deckId);
-    if (!targetDeck) return;
-    const hasGroup = targetDeck.groups.some((g) => g.id === groupId);
-    const newGroupIds = hasGroup
-      ? targetDeck.groups.filter((g) => g.id !== groupId).map((g) => g.id)
-      : [...targetDeck.groups.map((g) => g.id), groupId];
-
-    // APIでDBを更新
     try {
+      // 変更後のグループID配列を作成
+      const targetDeck = localDecks.find((d) => d.id === deckId);
+      if (!targetDeck) {
+        toast.error('デッキが見つかりません');
+        return;
+      }
+
+      const hasGroup = targetDeck.groups.some((g) => g.id === groupId);
+      const newGroupIds = hasGroup
+        ? targetDeck.groups.filter((g) => g.id !== groupId).map((g) => g.id)
+        : [...targetDeck.groups.map((g) => g.id), groupId];
+
+      // APIでDBを更新
       const res = await fetch(`/api/decks/${deckId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groupIds: newGroupIds }),
       });
-      if (!res.ok) throw new Error('グループ更新失敗');
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'グループ更新に失敗しました');
+      }
+
       // PATCH成功後に最新データを再取得
       const decksRes = await fetch('/api/decks');
+      if (!decksRes.ok) {
+        throw new Error('デッキ一覧の取得に失敗しました');
+      }
+
       const updatedDecks = await decksRes.json();
       setDecks(updatedDecks);
       setLocalDecks(updatedDecks);
-    } catch (e) {
-      alert('グループの更新に失敗しました');
+      toast.success('グループを更新しました');
+    } catch (error) {
+      console.error('グループ更新エラー:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'グループの更新に失敗しました',
+      );
     }
   };
 
@@ -184,7 +201,10 @@ export function DeckList({
       {sortedDecks.map((deck) => (
         <Card
           key={deck.id}
-          className="hover:shadow-md transition-shadow cursor-pointer"
+          className={cn(
+            'hover:shadow-md transition-shadow',
+            groupMode ? 'cursor-pointer' : '',
+          )}
           onClick={() => {
             if (groupMode) {
               setSelectedDeck(deck);
