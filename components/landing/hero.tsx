@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BrainCircuit } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -30,7 +31,13 @@ export function LandingHero() {
           aria-label="メインナビゲーション"
         >
           <div className="flex items-center gap-2">
-            <BrainCircuit className="h-8 w-8 text-primary" aria-hidden="true" />
+            <Image
+              src="/logo.png"
+              alt="MemorAIze"
+              width={64}
+              height={64}
+              className="h-16 w-16 text-primary"
+            />
             <h1 className="text-2xl font-bold">
               <Link href="/" className="hover:opacity-80 transition-opacity">
                 MemorAIze
