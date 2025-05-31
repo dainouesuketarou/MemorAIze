@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 
+// 動的レンダリングを明示的に指定
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -23,7 +26,9 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json(subscription);
+    return NextResponse.json(
+      subscription || { status: 'INACTIVE', plan: 'FREE' },
+    );
   } catch (error) {
     console.error('Error fetching subscription status:', error);
     return new NextResponse('Internal Server Error', { status: 500 });

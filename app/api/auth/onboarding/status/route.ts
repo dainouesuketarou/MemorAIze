@@ -1,32 +1,26 @@
 import { NextResponse } from 'next/server';
-import { getAuthSession } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+
+// 動的レンダリングを明示的に指定
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const session = await getAuthSession();
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
       select: { isOnboarded: true },
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json({ isOnboarded: user.isOnboarded });
+    return NextResponse.json({ isOnboarded: user?.isOnboarded ?? false });
   } catch (error) {
-    console.error('オンボーディング状態の確認に失敗しました:', error);
-    return NextResponse.json(
-      { error: 'オンボーディング状態の確認に失敗しました' },
-      { status: 500 },
-    );
+    console.error('Error fetching onboarding status:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

@@ -3,7 +3,7 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5分のタイムアウト
+export const maxDuration = 60; // 60秒のタイムアウト
 
 // Google Cloud クライアントの初期化関数
 const getGoogleCloudClients = () => {
