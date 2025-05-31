@@ -16,6 +16,8 @@ interface UserState {
   image: string | null;
   isAuthenticated: boolean;
   subscription: Subscription | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const initialState: UserState = {
@@ -25,6 +27,8 @@ const initialState: UserState = {
   image: null,
   isAuthenticated: false,
   subscription: null,
+  isLoading: true,
+  error: null,
 };
 
 const userSlice = createSlice({
@@ -32,16 +36,32 @@ const userSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<Partial<UserState>>) => {
-      return { ...state, ...action.payload };
+      return {
+        ...state,
+        ...action.payload,
+        isLoading: false,
+        error: null,
+      };
     },
     setSubscription: (state, action: PayloadAction<Subscription | null>) => {
       state.subscription = action.payload;
+      state.isLoading = false;
+      state.error = null;
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+      state.isLoading = false;
     },
     clearUser: (state) => {
-      return initialState;
+      return { ...initialState, isLoading: false };
     },
   },
 });
 
-export const { setUser, setSubscription, clearUser } = userSlice.actions;
+export const { setUser, setSubscription, setLoading, setError, clearUser } =
+  userSlice.actions;
+
 export default userSlice.reducer;

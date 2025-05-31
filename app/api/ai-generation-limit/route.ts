@@ -7,7 +7,19 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 const toIsoJst = (d: Date) =>
   new Date(d.getTime() + 9 * 60 * 60 * 1_000) // +09:00 へ補正
     .toISOString()
-    .replace('Z', '+09:00'); // ISO-8601 で明示
+    .replace('Z', '+09:00');
+
+/* ----- JST 日付取得 ----- */
+const getJstDate = () => {
+  const now = new Date();
+  return new Date(now.getTime() + 9 * 60 * 60 * 1_000);
+};
+
+/* ----- 月初日取得（JST） ----- */
+const getJstMonthStart = () => {
+  const jst = getJstDate();
+  return new Date(jst.getFullYear(), jst.getMonth(), 1);
+};
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -16,46 +28,54 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const nowUtc = new Date();
-  const monthUtc = new Date(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), 1); // 月初 (UTC)
-
+  const monthJst = getJstMonthStart();
   const MONTHLY_LIMIT = Number(process.env.MONTHLY_AI_LIMIT ?? 5);
 
   try {
     const aiLimit = await withPrisma(async (prisma) => {
-      // 既存のレコードを検索
-      const existingLimit = await prisma.aiGenerationLimit.findFirst({
+      // 既存のレコードを検索（同じ月のものを全て取得）
+      const existingLimits = await prisma.aiGenerationLimit.findMany({
         where: {
           userId,
           month: {
-            gte: monthUtc,
-            lt: new Date(
-              monthUtc.getUTCFullYear(),
-              monthUtc.getUTCMonth() + 1,
-              1,
-            ),
+            gte: monthJst,
+            lt: new Date(monthJst.getFullYear(), monthJst.getMonth() + 1, 1),
           },
         },
       });
 
-      if (existingLimit) {
-        return existingLimit;
+      // 複数のレコードが存在する場合は、最初のレコードを残して他を削除
+      if (existingLimits.length > 1) {
+        const [keepLimit, ...deleteLimits] = existingLimits;
+        await Promise.all(
+          deleteLimits.map((limit) =>
+            prisma.aiGenerationLimit.delete({
+              where: { id: limit.id },
+            }),
+          ),
+        );
+        return keepLimit;
       }
 
-      // 新規レコードを作成
+      // 1つのレコードが存在する場合はそれを返す
+      if (existingLimits.length === 1) {
+        return existingLimits[0];
+      }
+
+      // レコードが存在しない場合は新規作成
       return await prisma.aiGenerationLimit.create({
         data: {
           userId,
-          month: monthUtc,
+          month: monthJst,
           count: 0,
         },
       });
     });
 
-    /* JST に変換して返却 */
-    const resetUtc = new Date(
-      monthUtc.getUTCFullYear(),
-      monthUtc.getUTCMonth() + 1,
+    /* 次月の月初日（JST）を計算 */
+    const resetJst = new Date(
+      monthJst.getFullYear(),
+      monthJst.getMonth() + 1,
       1,
     );
 
@@ -64,7 +84,7 @@ export async function GET() {
       data: {
         count: aiLimit.count,
         limit: MONTHLY_LIMIT,
-        resetAt: toIsoJst(resetUtc),
+        resetAt: toIsoJst(resetJst),
       },
     });
   } catch (error) {
