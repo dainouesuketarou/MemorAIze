@@ -9,6 +9,7 @@ import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { createHash } from 'crypto';
 import { Adapter, AdapterUser } from 'next-auth/adapters';
+import { withPrisma } from '@/lib/prisma';
 
 // AWS SESクライアントの設定
 const sesClient = new SESClient({
@@ -32,33 +33,35 @@ const customPrismaAdapter = {
     providerAccountId: string;
   }): Promise<AdapterUser | null> => {
     try {
-      const user = await prisma.user.findFirst({
-        where: {
-          Account: {
-            some: {
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
+      return await withPrisma(async (prisma) => {
+        const user = await prisma.user.findFirst({
+          where: {
+            Account: {
+              some: {
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
             },
           },
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-          emailVerified: true,
-        },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            emailVerified: true,
+          },
+        });
+
+        if (!user) return null;
+
+        return {
+          id: user.id,
+          name: user.name || null,
+          email: user.email || '',
+          image: user.image || null,
+          emailVerified: user.emailVerified,
+        };
       });
-
-      if (!user) return null;
-
-      return {
-        id: user.id,
-        name: user.name || null,
-        email: user.email || '',
-        image: user.image || null,
-        emailVerified: user.emailVerified,
-      };
     } catch (error) {
       console.error('Error in getUserByAccount:', error);
       return null;
@@ -195,105 +198,107 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
         try {
-          // 既存のユーザーを検索（メールアドレスで検索）
-          const existingUser = await prisma.user.findUnique({
-            where: { email: user.email! },
-            include: {
-              Account: true,
-            },
-          });
-
-          // 既存のユーザーが存在する場合
-          if (existingUser) {
-            // Googleアカウントが既にリンクされているか確認
-            const hasGoogleAccount = existingUser.Account.some(
-              (acc) => acc.provider === 'google',
-            );
-
-            // Googleアカウントがリンクされていない場合、リンクを作成
-            if (!hasGoogleAccount) {
-              await prisma.account.create({
-                data: {
-                  userId: existingUser.id,
-                  type: account.type,
-                  provider: account.provider,
-                  providerAccountId: account.providerAccountId,
-                  access_token: account.access_token,
-                  expires_at: account.expires_at,
-                  token_type: account.token_type,
-                  scope: account.scope,
-                  id_token: account.id_token,
-                  session_state: account.session_state,
-                },
-              });
-            }
-
-            // ユーザー情報を更新
-            await prisma.user.update({
-              where: { id: existingUser.id },
-              data: {
-                name: user.name,
-                image: user.image,
-                emailVerified: new Date(),
+          return await withPrisma(async (prisma) => {
+            // 既存のユーザーを検索（メールアドレスで検索）
+            const existingUser = await prisma.user.findUnique({
+              where: { email: user.email! },
+              include: {
+                Account: true,
               },
             });
 
-            return true;
-          }
+            // 既存のユーザーが存在する場合
+            if (existingUser) {
+              // Googleアカウントが既にリンクされているか確認
+              const hasGoogleAccount = existingUser.Account.some(
+                (acc) => acc.provider === 'google',
+              );
 
-          // 新規ユーザーの場合
-          const newUser = await prisma.user.create({
-            data: {
-              email: user.email!,
-              name: user.name,
-              image: user.image,
-              emailVerified: new Date(),
-              isOnboarded: false,
-              stripeCustomerId: null,
-              Account: {
-                create: {
-                  type: account.type,
-                  provider: account.provider,
-                  providerAccountId: account.providerAccountId,
-                  access_token: account.access_token,
-                  expires_at: account.expires_at,
-                  token_type: account.token_type,
-                  scope: account.scope,
-                  id_token: account.id_token,
-                  session_state: account.session_state,
+              // Googleアカウントがリンクされていない場合、リンクを作成
+              if (!hasGoogleAccount) {
+                await prisma.account.create({
+                  data: {
+                    userId: existingUser.id,
+                    type: account.type,
+                    provider: account.provider,
+                    providerAccountId: account.providerAccountId,
+                    access_token: account.access_token,
+                    expires_at: account.expires_at,
+                    token_type: account.token_type,
+                    scope: account.scope,
+                    id_token: account.id_token,
+                    session_state: account.session_state,
+                  },
+                });
+              }
+
+              // ユーザー情報を更新
+              await prisma.user.update({
+                where: { id: existingUser.id },
+                data: {
+                  name: user.name,
+                  image: user.image,
+                  emailVerified: new Date(),
+                },
+              });
+
+              return true;
+            }
+
+            // 新規ユーザーの場合
+            const newUser = await prisma.user.create({
+              data: {
+                email: user.email!,
+                name: user.name,
+                image: user.image,
+                emailVerified: new Date(),
+                isOnboarded: false,
+                stripeCustomerId: null,
+                Account: {
+                  create: {
+                    type: account.type,
+                    provider: account.provider,
+                    providerAccountId: account.providerAccountId,
+                    access_token: account.access_token,
+                    expires_at: account.expires_at,
+                    token_type: account.token_type,
+                    scope: account.scope,
+                    id_token: account.id_token,
+                    session_state: account.session_state,
+                  },
                 },
               },
-            },
+            });
+
+            // 新規ユーザー用の初期データを作成
+            await Promise.all([
+              // Freeプランを設定
+              prisma.subscription.create({
+                data: {
+                  userId: newUser.id,
+                  plan: 'FREE',
+                  status: 'ACTIVE',
+                  stripeSubscriptionId: null,
+                  stripePriceId: null,
+                  stripeCurrentPeriodEnd: null,
+                },
+              }),
+              // AI使用制限を設定
+              prisma.aiGenerationLimit.create({
+                data: {
+                  userId: newUser.id,
+                  month: new Date(
+                    new Date().getFullYear(),
+                    new Date().getMonth(),
+                    1,
+                  ),
+                  count: 0,
+                },
+              }),
+            ]);
+
+            return true;
           });
-
-          // 新規ユーザー用の初期データを作成
-          await Promise.all([
-            // Freeプランを設定
-            prisma.subscription.create({
-              data: {
-                userId: newUser.id,
-                plan: 'FREE',
-                status: 'ACTIVE',
-                stripeSubscriptionId: null,
-                stripePriceId: null,
-                stripeCurrentPeriodEnd: null,
-              },
-            }),
-            // AI使用制限を設定
-            prisma.aiGenerationLimit.create({
-              data: {
-                userId: newUser.id,
-                month: new Date(
-                  new Date().getFullYear(),
-                  new Date().getMonth(),
-                  1,
-                ),
-                count: 0,
-              },
-            }),
-          ]);
-
-          return true;
         } catch (error) {
           console.error('Error in signIn callback:', error);
           return false;

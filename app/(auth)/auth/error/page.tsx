@@ -34,8 +34,8 @@ export default function ErrorPage() {
           <Image
             src="/logo.png"
             alt="MemorAIze"
-            width={32}
-            height={32}
+            width={64}
+            height={64}
             className="mr-2"
           />
           <h1 className="text-3xl font-bold">MemorAIze</h1>
