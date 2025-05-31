@@ -68,6 +68,13 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: 'consent',
+          access_type: 'offline',
+          response_type: 'code',
+        },
+      },
     }),
     EmailProvider({
       from: process.env.AWS_SES_FROM_EMAIL,
@@ -193,6 +200,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
     verifyRequest: '/auth/email-sent',
+    error: '/auth/error',
   },
   session: {
     strategy: 'jwt',
@@ -324,9 +332,9 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    async jwt({ token, user, account }) {
-      if (account && user) {
-        token.sub = user.id;
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
       }
       return token;
     },
