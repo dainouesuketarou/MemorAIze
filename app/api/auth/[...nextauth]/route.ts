@@ -88,20 +88,8 @@ export const authOptions: NextAuthOptions = {
         // 6桁の数字を生成
         return Math.floor(100000 + Math.random() * 900000).toString();
       },
-      sendVerificationRequest: async ({ identifier, url, token }) => {
+      async sendVerificationRequest({ identifier, url, token }) {
         try {
-          console.log('→ AWS_REGION:', process.env.AWS_REGION);
-          console.log(
-            '→ AWS_ACCESS_KEY_ID:',
-            process.env.AWS_ACCESS_KEY_ID?.slice(0, 4),
-            '…',
-          );
-          console.log(
-            '→ AWS_SECRET_ACCESS_KEY:',
-            process.env.AWS_SECRET_ACCESS_KEY ? 'set' : '＜empty＞',
-          );
-          console.log('→ AWS_SES_FROM_EMAIL:', process.env.AWS_SES_FROM_EMAIL);
-
           const command = new SendEmailCommand({
             Source: process.env.AWS_SES_FROM_EMAIL,
             Destination: {
@@ -127,17 +115,9 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          const response = await sesClient.send(command);
-          console.log('Email sent successfully:', response);
+          await sesClient.send(command);
         } catch (error) {
           console.error('Error sending verification email:', error);
-          if (error instanceof Error) {
-            console.error('Error details:', {
-              name: error.name,
-              message: error.message,
-              stack: error.stack,
-            });
-          }
           throw new Error(
             'メールの送信に失敗しました。管理者にお問い合わせください。',
           );

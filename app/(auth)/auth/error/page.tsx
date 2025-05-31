@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { BrainCircuit } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -31,7 +31,13 @@ export default function ErrorPage() {
     <div className="container flex h-screen flex-col items-center justify-center">
       <Link href="/">
         <div className="flex items-center mb-8">
-          <BrainCircuit className="h-8 w-8 mr-2 text-primary" />
+          <Image
+            src="/logo.png"
+            alt="MemorAIze"
+            width={32}
+            height={32}
+            className="mr-2"
+          />
           <h1 className="text-3xl font-bold">MemorAIze</h1>
         </div>
       </Link>
