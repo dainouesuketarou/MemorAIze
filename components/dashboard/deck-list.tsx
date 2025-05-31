@@ -73,32 +73,38 @@ export function DeckList({
   const [deckToDelete, setDeckToDelete] =
     useState<DeckWithCardsAndGroups | null>(null);
   const router = useRouter();
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
   // 親の decks が変わったら更新
   useEffect(() => {
     setLocalDecks(decks);
   }, [decks]);
 
-  // モーダル内での分野付け替え
-  const toggleDeckGroup = async (deckId: string, groupId: string) => {
+  // モーダルを開く時に選択状態を初期化
+  useEffect(() => {
+    if (selectedDeck) {
+      setSelectedGroups(selectedDeck.groups.map((g) => g.id));
+    }
+  }, [selectedDeck]);
+
+  // グループの選択状態を更新
+  const handleGroupToggle = (groupId: string) => {
+    setSelectedGroups((prev) =>
+      prev.includes(groupId)
+        ? prev.filter((id) => id !== groupId)
+        : [...prev, groupId],
+    );
+  };
+
+  // グループ化を確定
+  const handleGroupConfirm = async () => {
+    if (!selectedDeck) return;
+
     try {
-      // 変更後のグループID配列を作成
-      const targetDeck = localDecks.find((d) => d.id === deckId);
-      if (!targetDeck) {
-        toast.error('デッキが見つかりません');
-        return;
-      }
-
-      const hasGroup = targetDeck.groups.some((g) => g.id === groupId);
-      const newGroupIds = hasGroup
-        ? targetDeck.groups.filter((g) => g.id !== groupId).map((g) => g.id)
-        : [...targetDeck.groups.map((g) => g.id), groupId];
-
-      // APIでDBを更新
-      const res = await fetch(`/api/decks/${deckId}`, {
+      const res = await fetch(`/api/decks/${selectedDeck.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupIds: newGroupIds }),
+        body: JSON.stringify({ groupIds: selectedGroups }),
       });
 
       if (!res.ok) {
@@ -116,6 +122,7 @@ export function DeckList({
       setDecks(updatedDecks);
       setLocalDecks(updatedDecks);
       toast.success('グループを更新しました');
+      setModalOpen(false);
     } catch (error) {
       console.error('グループ更新エラー:', error);
       toast.error(
@@ -363,40 +370,53 @@ export function DeckList({
 
       {/* グループ化モーダル */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>グループ化</DialogTitle>
             <DialogDescription>
               {selectedDeck?.title}のグループを設定します
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="grid gap-4 py-4">
             {groups.map((group) => (
-              <div key={group.id} className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id={`group-${group.id}`}
-                  checked={selectedDeck?.groups.some((g) => g.id === group.id)}
-                  onChange={() => {
-                    if (selectedDeck) {
-                      toggleDeckGroup(selectedDeck.id, group.id);
-                    }
-                  }}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <label
-                  htmlFor={`group-${group.id}`}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  {group.name}
-                </label>
+              <div
+                key={group.id}
+                className={cn(
+                  'flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer',
+                  selectedGroups.includes(group.id)
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50',
+                )}
+                onClick={() => handleGroupToggle(group.id)}
+              >
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={cn(
+                      'h-4 w-4 rounded-full border-2 flex items-center justify-center',
+                      selectedGroups.includes(group.id)
+                        ? 'border-primary bg-primary'
+                        : 'border-border',
+                    )}
+                  >
+                    {selectedGroups.includes(group.id) && (
+                      <div className="h-2 w-2 rounded-full bg-background" />
+                    )}
+                  </div>
+                  <span className="font-medium">{group.name}</span>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {selectedDeck?.groups.some((g) => g.id === group.id)
+                    ? '現在のグループ'
+                    : ''}
+                </span>
               </div>
             ))}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex justify-between sm:justify-between">
             <DialogClose asChild>
-              <Button variant="outline">閉じる</Button>
+              <Button variant="outline">キャンセル</Button>
             </DialogClose>
+            <Button onClick={handleGroupConfirm}>確定</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
