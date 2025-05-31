@@ -1,6 +1,6 @@
 'use client';
 
-import { BrainCircuit, Check, Sparkles, ArrowLeft } from 'lucide-react';
+import { Check, Sparkles, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -255,7 +256,13 @@ export default function SubscriptionPage() {
 
       <div className="text-center mb-12">
         <div className="flex items-center justify-center mb-4">
-          <BrainCircuit className="h-8 w-8 mr-2 text-primary" />
+          <Image
+            src="/logo.png"
+            alt="MemorAIze"
+            width={64}
+            height={64}
+            className="h-16 w-16 text-primary"
+          />
           <h1 className="text-3xl font-bold">MemorAIze</h1>
         </div>
         <h2 className="text-4xl font-bold mb-4">プラン選択</h2>

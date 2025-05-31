@@ -212,7 +212,7 @@ export function DashboardShell({
           </div>
 
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
+            {/* <Bell className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" /> */}
             <ThemeToggle />
             <UserNav />
           </div>

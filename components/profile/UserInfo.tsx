@@ -46,7 +46,7 @@ export const UserInfo: React.FC<UserInfoProps> = ({ username, email }) => {
             {/* ユーザーの丸い形のアイコン */}
             <Avatar className="h-8 w-8 rounded-full">
               <AvatarImage
-                src={user?.image || 'https://github.com/shadcn.png'}
+                src={user?.image || '/profile.png'}
                 alt={user?.name || '@user'}
                 className="rounded-full h-8 w-8"
               />
