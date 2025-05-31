@@ -1,8 +1,10 @@
 'use client';
 
 import { Group } from '@prisma/client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 
 interface SidebarProps {
   groups: Group[];
@@ -25,21 +27,31 @@ export function Sidebar({
   showGroupInput,
   setShowGroupInput,
 }: SidebarProps) {
+  const [isLoading, setIsLoading] = useState(true);
+
   /* ───────────────── フェッチ ───────────────── */
   useEffect(() => {
+    setIsLoading(true);
     fetch('/api/groups')
       .then((r) => r.json())
       .then((data: Group[]) => setGroups(data))
-      .catch((e) => console.error('グループ取得エラー:', e));
+      .catch((e) => console.error('グループ取得エラー:', e))
+      .finally(() => setIsLoading(false));
   }, []);
 
   /* ---------------「すべて」タブを挿入 --------------- */
-  const allTab: Group = { id: 'all', name: 'すべて', createdAt: new Date(), updatedAt: new Date() } as any;
+  const allTab: Group = {
+    id: 'all',
+    name: 'すべて',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as any;
   const displayGroups = [allTab, ...groups];
 
   /* ───────────────── 追加 ───────────────── */
   const handleAddGroup = async () => {
     if (!newGroupName.trim()) return;
+    setIsLoading(true);
     try {
       const res = await fetch('/api/groups', {
         method: 'POST',
@@ -52,35 +64,52 @@ export function Sidebar({
       setNewGroupName('');
       setShowGroupInput(false);
     } catch {
-      alert('グループの作成に失敗しました');
+      toast.error('グループの作成に失敗しました');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   /* ───────────────── UI ───────────────── */
   return (
     <aside className="flex flex-col items-center gap-2 py-4 pl-4">
-      {displayGroups.map((g) => {
-        const active = selectedGroup === g.id;
-        return (
-          <button
-            key={g.id}
-            onClick={() => setSelectedGroup(g.id)}
-            className={`relative w-24 h-10 pl-4 pr-3 flex items-center text-sm font-medium truncate transition
-              ${active ? 'bg-primary text-white shadow-lg' : 'bg-muted text-muted-foreground hover:bg-muted/70'}
-            `}
-            style={{
-              clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
-            }}
-          >
-            {g.name}
-            <span
-              className={`absolute left-0 top-0 h-full w-1 rounded-l
-                ${active ? 'bg-white/70' : 'bg-primary/40'}
-              `}
+      {isLoading
+        ? // ローディング中のスケルトンUI
+          Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="relative w-24 h-10 bg-muted animate-pulse"
+              style={{
+                clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
+              }}
             />
-          </button>
-        );
-      })}
+          ))
+        : displayGroups.map((g) => {
+            const active = selectedGroup === g.id;
+            return (
+              <button
+                key={g.id}
+                onClick={() => setSelectedGroup(g.id)}
+                className={`relative w-24 h-10 pl-4 pr-3 flex items-center text-sm font-medium truncate transition
+                ${
+                  active
+                    ? 'bg-primary text-white shadow-lg'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                }
+              `}
+                style={{
+                  clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
+                }}
+              >
+                {g.name}
+                <span
+                  className={`absolute left-0 top-0 h-full w-1 rounded-l
+                  ${active ? 'bg-white/70' : 'bg-primary/40'}
+                `}
+                />
+              </button>
+            );
+          })}
 
       {/* ───── 新規グループ入力 or 追加ボタン ───── */}
       {showGroupInput ? (
@@ -92,16 +121,30 @@ export function Sidebar({
             onKeyDown={(e) => e.key === 'Enter' && handleAddGroup()}
             placeholder="新グループ"
             autoFocus
+            disabled={isLoading}
           />
           <div className="flex gap-1">
-            <Button size="sm" className="flex-1" onClick={handleAddGroup}>
-              追加
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={handleAddGroup}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <div className="mr-2 h-3 w-3 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                  追加中
+                </>
+              ) : (
+                '追加'
+              )}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               className="flex-1"
               onClick={() => setShowGroupInput(false)}
+              disabled={isLoading}
             >
               ×
             </Button>
@@ -114,6 +157,7 @@ export function Sidebar({
           style={{
             clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
           }}
+          disabled={isLoading}
         >
           ＋新規
         </button>

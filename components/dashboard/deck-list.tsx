@@ -74,6 +74,7 @@ export function DeckList({
     useState<DeckWithCardsAndGroups | null>(null);
   const router = useRouter();
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // 親の decks が変わったら更新
   useEffect(() => {
@@ -99,6 +100,7 @@ export function DeckList({
   // グループ化を確定
   const handleGroupConfirm = async () => {
     if (!selectedDeck) return;
+    setIsLoading(true);
 
     try {
       const res = await fetch(`/api/decks/${selectedDeck.id}`, {
@@ -128,6 +130,8 @@ export function DeckList({
       toast.error(
         error instanceof Error ? error.message : 'グループの更新に失敗しました',
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -414,9 +418,20 @@ export function DeckList({
           </div>
           <DialogFooter className="flex justify-between sm:justify-between">
             <DialogClose asChild>
-              <Button variant="outline">キャンセル</Button>
+              <Button variant="outline" disabled={isLoading}>
+                キャンセル
+              </Button>
             </DialogClose>
-            <Button onClick={handleGroupConfirm}>確定</Button>
+            <Button onClick={handleGroupConfirm} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                  処理中...
+                </>
+              ) : (
+                '確定'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
