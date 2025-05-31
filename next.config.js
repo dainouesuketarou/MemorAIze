@@ -8,6 +8,18 @@ const nextConfig = {
   webpack: (config) => {
     return config;
   },
+  // 画像の最適化設定
+  images: {
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
   // 環境変数の読み込みを明示的に設定
   env: {
     // ここに環境変数を追加

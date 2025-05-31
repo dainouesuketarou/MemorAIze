@@ -39,6 +39,7 @@ interface Subscription {
   stripePriceId: string | null;
   stripeCurrentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  stripeCustomerId: string | null;
 }
 
 type PaymentMethod = {
@@ -96,11 +97,27 @@ export default function BillingPage() {
       if (activeTab === 'payment') {
         setIsLoadingPaymentMethods(true);
         try {
+          if (!subscription?.stripeCustomerId) {
+            console.log('No stripeCustomerId found:', subscription);
+            setPaymentMethods([]);
+            return;
+          }
+
           const response = await fetch('/api/subscription/payment-methods');
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Payment methods fetch error:', errorData);
+            throw new Error(
+              errorData.error || '支払い方法の取得に失敗しました',
+            );
+          }
           const data = await response.json();
-          setPaymentMethods(data.paymentMethods);
+          console.log('Fetched payment methods:', data);
+          setPaymentMethods(data.paymentMethods || []);
         } catch (error) {
+          console.error('Error fetching payment methods:', error);
           toast.error('支払い方法の取得に失敗しました');
+          setPaymentMethods([]);
         } finally {
           setIsLoadingPaymentMethods(false);
         }
@@ -108,25 +125,13 @@ export default function BillingPage() {
     };
 
     fetchPaymentMethods();
-  }, [activeTab]);
+  }, [activeTab, subscription]);
 
   const handleUpgrade = async () => {
     try {
-      const response = await fetch('/api/subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
-        }),
-      });
-
-      const { subscriptionId, clientSecret } = await response.json();
-      // Stripeの決済ページにリダイレクト
-      window.location.href = `/payment?subscriptionId=${subscriptionId}&clientSecret=${clientSecret}`;
+      router.push('/subscription');
     } catch (error) {
-      toast.error('決済ページへの遷移に失敗しました');
+      toast.error('プラン選択ページへの遷移に失敗しました');
     }
   };
 
@@ -141,14 +146,19 @@ export default function BillingPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.error?.includes('incomplete')) {
+          toast.error(
+            '支払いが完了していないため、キャンセルできません。支払いを完了してください。',
+          );
+          return;
+        }
         throw new Error(
           data.error || 'サブスクリプションのキャンセルに失敗しました',
         );
       }
 
-      toast.success(data.message);
+      toast.success(data.message || 'サブスクリプションをキャンセルしました');
 
-      // サブスクリプション情報を更新
       const updatedSubscription: Subscription = {
         ...subscription,
         status: 'CANCELED',
@@ -162,17 +172,79 @@ export default function BillingPage() {
       dispatch(setSubscription(updatedSubscription));
     } catch (error) {
       console.error('Cancel error:', error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : 'サブスクリプションのキャンセルに失敗しました',
+      if (error instanceof Error) {
+        if (error.message.includes('incomplete')) {
+          toast.error(
+            '支払いが完了していないため、キャンセルできません。支払いを完了してください。',
+          );
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.error('サブスクリプションのキャンセルに失敗しました');
+      }
+    }
+  };
+
+  const handleAddPaymentMethod = async () => {
+    try {
+      const response = await fetch('/api/subscription/create-payment-intent', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('支払い方法の追加に失敗しました');
+      }
+
+      const { clientSecret } = await response.json();
+
+      window.location.href = `/payment/add?clientSecret=${clientSecret}`;
+    } catch (error) {
+      toast.error('支払い方法の追加に失敗しました');
+    }
+  };
+
+  const handleDeletePaymentMethod = async (paymentMethodId: string) => {
+    try {
+      const response = await fetch('/api/subscription/payment-methods', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ paymentMethodId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('支払い方法の削除に失敗しました');
+      }
+
+      setPaymentMethods((prev) =>
+        prev.filter((method) => method.id !== paymentMethodId),
       );
+
+      toast.success('支払い方法を削除しました');
+    } catch (error) {
+      toast.error('支払い方法の削除に失敗しました');
     }
   };
 
   const formatCardNumber = (last4: string) => `**** **** **** ${last4}`;
   const formatExpiryDate = (month: number, year: number) =>
     `${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
+
+  const formatDate = (dateString: string | Date | null | undefined) => {
+    if (!dateString) return 'なし';
+    const date =
+      typeof dateString === 'string' ? new Date(dateString) : dateString;
+    return date.toLocaleDateString('ja-JP');
+  };
+
+  const getSubscriptionEndDate = (date: Date | null) => {
+    if (!date) return 'なし';
+    const endDate = new Date(date);
+    endDate.setDate(endDate.getDate() - 1); // 前日を計算
+    return endDate.toLocaleDateString('ja-JP');
+  };
 
   const renderPaymentMethods = () => {
     if (isLoadingPaymentMethods) {
@@ -183,13 +255,34 @@ export default function BillingPage() {
       );
     }
 
-    if (paymentMethods.length === 0) {
+    if (!subscription?.stripeCustomerId) {
       return (
         <div className="text-center py-8">
           <p className="text-muted-foreground">
-            登録されている支払い方法はありません
+            サブスクリプションを契約すると、支払い方法を管理できます
           </p>
-          <Button className="mt-4" variant="outline">
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => router.push('/subscription')}
+          >
+            プランを選択
+          </Button>
+        </div>
+      );
+    }
+
+    if (!paymentMethods || paymentMethods.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">
+            支払い方法が登録されていません
+          </p>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={handleAddPaymentMethod}
+          >
             <Plus className="w-4 h-4 mr-2" />
             支払い方法を追加
           </Button>
@@ -202,7 +295,7 @@ export default function BillingPage() {
         {paymentMethods.map((method) => (
           <div
             key={method.id}
-            className="flex items-center justify-between p-4 border rounded-lg"
+            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center space-x-4">
               <CreditCard className="w-6 h-6 text-muted-foreground" />
@@ -227,16 +320,28 @@ export default function BillingPage() {
                 variant="ghost"
                 size="icon"
                 className="text-red-500 hover:text-red-600"
+                onClick={() => handleDeletePaymentMethod(method.id)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
           </div>
         ))}
-        <Button className="w-full mt-4" variant="outline">
-          <Plus className="w-4 h-4 mr-2" />
-          支払い方法を追加
-        </Button>
+        <div className="flex justify-between items-center pt-4">
+          <Button
+            variant="outline"
+            onClick={handleAddPaymentMethod}
+            className="flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            新しい支払い方法を追加
+          </Button>
+          {paymentMethods.length > 1 && (
+            <p className="text-sm text-muted-foreground">
+              複数の支払い方法を登録できます
+            </p>
+          )}
+        </div>
       </div>
     );
   };
@@ -278,7 +383,9 @@ export default function BillingPage() {
                     <span className="text-muted-foreground">ステータス</span>
                     <span className="font-medium">
                       {subscription?.status === 'ACTIVE'
-                        ? '有効'
+                        ? subscription?.cancelAtPeriodEnd
+                          ? 'キャンセル済み（利用中）'
+                          : '有効'
                         : subscription?.status === 'CANCELED'
                         ? 'キャンセル済み'
                         : subscription?.status === 'PAST_DUE'
@@ -290,42 +397,32 @@ export default function BillingPage() {
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">次回請求日</span>
+                    <span className="text-muted-foreground">
+                      {subscription?.status === 'CANCELED'
+                        ? '利用可能期限'
+                        : '次回請求日'}
+                    </span>
                     <span className="font-medium">
-                      {subscription?.stripeCurrentPeriodEnd
-                        ? subscription.stripeCurrentPeriodEnd.toLocaleDateString(
-                            'ja-JP',
+                      {subscription?.status === 'CANCELED'
+                        ? getSubscriptionEndDate(
+                            subscription?.stripeCurrentPeriodEnd,
                           )
-                        : 'なし'}
+                        : formatDate(subscription?.stripeCurrentPeriodEnd)}
                     </span>
                   </div>
-                  {subscription?.cancelAtPeriodEnd && (
-                    <>
-                      <Separator />
-                      <div className="text-sm text-muted-foreground">
-                        現在のプランは期間終了時にキャンセルされます
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        プロプランは{' '}
-                        {subscription.stripeCurrentPeriodEnd
-                          ? format(
-                              subscription.stripeCurrentPeriodEnd,
-                              'yyyy年MM月dd日',
-                              {
-                                locale: ja,
-                              },
-                            )
-                          : 'なし'}{' '}
-                        まで利用可能です
-                      </div>
-                    </>
+                  {subscription?.status === 'CANCELED' && (
+                    <div className="text-sm text-muted-foreground">
+                      現在のプランは
+                      {formatDate(subscription?.stripeCurrentPeriodEnd)}
+                      まで利用可能です
+                    </div>
                   )}
                 </div>
               </CardContent>
               <CardFooter className="flex justify-between">
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/billing/upgrade')}
+                  onClick={() => router.push('/subscription')}
                 >
                   プランを変更
                 </Button>
@@ -376,19 +473,19 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-primary/5">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
               <button
                 onClick={() => router.back()}
-                className="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mr-4"
+                className="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 mr-4"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">課金情報</h1>
+              <h1 className="text-2xl font-bold">課金情報</h1>
             </div>
           </div>
         </div>
@@ -396,53 +493,74 @@ export default function BillingPage() {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Sidebar */}
-          <div className="w-full md:w-64 flex-shrink-0">
-            <nav className="bg-white shadow-sm rounded-lg overflow-hidden">
-              <div className="px-4 py-5 border-b border-gray-200">
-                <p className="text-sm font-medium text-gray-500">メニュー</p>
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>現在のプラン</CardTitle>
+              <CardDescription>
+                {subscription?.plan === 'PRO_MONTHLY'
+                  ? 'プロプラン（月額）'
+                  : subscription?.plan === 'PRO_YEARLY'
+                  ? 'プロプラン（年額）'
+                  : '無料プラン'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">ステータス</span>
+                  <span className="font-medium">
+                    {subscription?.status === 'ACTIVE'
+                      ? '有効'
+                      : subscription?.status === 'CANCELED'
+                      ? subscription?.cancelAtPeriodEnd
+                        ? 'キャンセル済み'
+                        : 'キャンセル済み（利用中）'
+                      : subscription?.status === 'PAST_DUE'
+                      ? '支払い期限切れ'
+                      : subscription?.status === 'TRIALING'
+                      ? 'トライアル中'
+                      : '無効'}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    {subscription?.status === 'CANCELED'
+                      ? '利用可能期限'
+                      : '次回請求日'}
+                  </span>
+                  <span className="font-medium">
+                    {subscription?.status === 'CANCELED'
+                      ? getSubscriptionEndDate(
+                          subscription?.stripeCurrentPeriodEnd,
+                        )
+                      : formatDate(subscription?.stripeCurrentPeriodEnd)}
+                  </span>
+                </div>
+                {subscription?.status === 'CANCELED' && (
+                  <div className="text-sm text-muted-foreground">
+                    現在のプランは
+                    {formatDate(subscription?.stripeCurrentPeriodEnd)}
+                    まで利用可能です
+                  </div>
+                )}
               </div>
-              <div className="py-2">
-                <button
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium ${
-                    activeTab === 'overview'
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setActiveTab('overview')}
-                >
-                  <Settings className="w-5 h-5 mr-3" />
-                  概要
-                </button>
-                <button
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium ${
-                    activeTab === 'payment'
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setActiveTab('payment')}
-                >
-                  <CreditCard className="w-5 h-5 mr-3" />
-                  支払い方法
-                </button>
-                <button
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium ${
-                    activeTab === 'usage'
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setActiveTab('usage')}
-                >
-                  <BarChart className="w-5 h-5 mr-3" />
-                  利用状況
-                </button>
-              </div>
-            </nav>
-          </div>
-
-          {/* Main content */}
-          <div className="flex-1">{renderTabContent()}</div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={() => router.push('/subscription')}
+              >
+                プランを変更
+              </Button>
+              {canCancel && (
+                <Button variant="destructive" onClick={handleCancel}>
+                  キャンセル
+                </Button>
+              )}
+            </CardFooter>
+          </Card>
         </div>
       </main>
     </div>

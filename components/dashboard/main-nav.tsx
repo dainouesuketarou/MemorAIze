@@ -8,6 +8,7 @@ import {
   Group as GroupIcon,
   Repeat,
 } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Group } from '@prisma/client';
@@ -33,7 +34,13 @@ export function MainNav({
   return (
     <div className="flex items-center">
       <Link href="/dashboard" className="mr-6 flex items-center space-x-2">
-        <BrainCircuit className="h-6 w-6" />
+        <Image
+          src="/logo.png"
+          alt="MemorAIze"
+          width={64}
+          height={64}
+          className="h-16 w-16 text-primary"
+        />
         <span className="hidden font-bold sm:inline-block">MemorAIze</span>
       </Link>
       <nav className="flex items-center space-x-2">

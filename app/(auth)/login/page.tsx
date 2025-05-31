@@ -23,8 +23,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { BrainCircuit } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { signIn } from 'next-auth/react';
@@ -163,7 +163,13 @@ export default function LoginPage() {
       <div className="w-full max-w-2xl mx-auto">
         <Link href="/">
           <div className="flex items-center mb-8 justify-center">
-            <BrainCircuit className="h-8 w-8 mr-2 text-primary" />
+            <Image
+              src="/logo.png"
+              alt="MemorAIze"
+              width={64}
+              height={64}
+              className="h-16 w-16 text-primary"
+            />
             <h1 className="text-3xl font-bold">MemorAIze</h1>
           </div>
         </Link>

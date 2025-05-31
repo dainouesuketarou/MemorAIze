@@ -47,7 +47,7 @@ export function UserNav() {
         <DropdownMenuTrigger asChild>
           <Avatar className="h-8 w-8 cursor-pointer">
             <AvatarImage
-              src={user?.image || 'https://github.com/shadcn.png'}
+              src={user?.image || '/profile.png'}
               alt={user?.name || '@user'}
             />
             <AvatarFallback>
