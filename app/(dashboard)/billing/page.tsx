@@ -29,10 +29,14 @@ import {
 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { setSubscription } from '@/lib/store/slices/userSlice';
-import { $Enums } from '@prisma/client';
 
-type SubscriptionStatus = $Enums.SubscriptionStatus;
-type SubscriptionPlan = $Enums.SubscriptionPlan;
+export type SubscriptionStatus =
+  | 'ACTIVE'
+  | 'CANCELED'
+  | 'PAST_DUE'
+  | 'UNPAID'
+  | 'TRIALING';
+export type SubscriptionPlan = 'FREE' | 'PRO_MONTHLY' | 'PRO_YEARLY';
 
 interface Subscription {
   id: string;
