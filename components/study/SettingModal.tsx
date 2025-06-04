@@ -12,6 +12,7 @@ import { DeckSetting } from '@/hooks/useDeckSetting';
 import { FilterMode } from '@prisma/client';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { useCallback, useMemo } from 'react';
 
 interface Props {
   open: boolean;
@@ -35,11 +36,42 @@ export function SettingModal({
   stats,
   onSave,
 }: Props) {
-  const toggleMode = (k: FilterMode) => {
-    const s = new Set(value.filterMode);
-    s.has(k) ? s.delete(k) : s.add(k);
-    onSave({ filterMode: Array.from(s) });
-  };
+  // モード切り替えをメモ化
+  const toggleMode = useCallback(
+    (k: FilterMode) => {
+      const s = new Set(value.filterMode);
+      s.has(k) ? s.delete(k) : s.add(k);
+      onSave({ filterMode: Array.from(s) });
+    },
+    [value.filterMode, onSave],
+  );
+
+  // モードの選択状態をメモ化
+  const modeStates = useMemo(
+    () =>
+      modes.map(({ key, label }) => ({
+        key,
+        label,
+        count: stats[key] ?? 0,
+        isChecked: value.filterMode.includes(key),
+        disabled: stats[key] === 0 && !value.filterMode.includes(key),
+      })),
+    [stats, value.filterMode],
+  );
+
+  // 設定変更をメモ化
+  const handleSettingChange = useCallback(
+    (key: keyof DeckSetting, newValue: any) => {
+      onSave({ [key]: newValue });
+    },
+    [onSave],
+  );
+
+  // 再スタート処理をメモ化
+  const handleRestart = useCallback(() => {
+    onSave({ reset: true } as any);
+    onOpenChange(false);
+  }, [onSave, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,7 +86,7 @@ export function SettingModal({
             <span>自動音声読み上げ</span>
             <Switch
               checked={value.autoSpeak}
-              onCheckedChange={(v) => onSave({ autoSpeak: v })}
+              onCheckedChange={(v) => handleSettingChange('autoSpeak', v)}
             />
           </div>
 
@@ -63,7 +95,7 @@ export function SettingModal({
             <span>表裏を逆にする</span>
             <Switch
               checked={value.reverse}
-              onCheckedChange={(v) => onSave({ reverse: v })}
+              onCheckedChange={(v) => handleSettingChange('reverse', v)}
             />
           </div>
 
@@ -71,36 +103,31 @@ export function SettingModal({
           <div>
             <p className="mb-1 font-medium">学習対象カード</p>
             <div className="grid grid-cols-2 gap-2">
-              {modes.map(({ key, label }) => {
-                const count = stats[key] ?? 0;
-                const isChecked = value.filterMode.includes(key);
-                const disabled = count === 0 && !isChecked;
-                return (
-                  <label
-                    key={key}
-                    className={cn(
-                      'flex items-center gap-2 p-2 rounded border',
-                      disabled
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'hover:bg-muted/50 cursor-pointer',
-                    )}
-                    title={
-                      disabled
-                        ? `${label} のカードが0件なので選択できません`
-                        : undefined
-                    }
-                  >
-                    <Checkbox
-                      checked={isChecked}
-                      disabled={disabled}
-                      onCheckedChange={() => toggleMode(key)}
-                    />
-                    <span>
-                      {label} ({count})
-                    </span>
-                  </label>
-                );
-              })}
+              {modeStates.map(({ key, label, count, isChecked, disabled }) => (
+                <label
+                  key={key}
+                  className={cn(
+                    'flex items-center gap-2 p-2 rounded border',
+                    disabled
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:bg-muted/50 cursor-pointer',
+                  )}
+                  title={
+                    disabled
+                      ? `${label} のカードが0件なので選択できません`
+                      : undefined
+                  }
+                >
+                  <Checkbox
+                    checked={isChecked}
+                    disabled={disabled}
+                    onCheckedChange={() => toggleMode(key)}
+                  />
+                  <span>
+                    {label} ({count})
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
 
@@ -109,17 +136,13 @@ export function SettingModal({
             <span>出題順をシャッフル</span>
             <Switch
               checked={value.shuffle}
-              onCheckedChange={(v) => onSave({ shuffle: v })}
+              onCheckedChange={(v) => handleSettingChange('shuffle', v)}
             />
           </div>
 
-          {/* 進捗リセット */}
-          <Button
-            variant="destructive"
-            onClick={() => onSave({ reset: true } as any)}
-            className="w-full"
-          >
-            進捗をリセット
+          {/* 再スタートボタン */}
+          <Button variant="default" onClick={handleRestart} className="w-full">
+            暗記カードを再スタートする
           </Button>
         </div>
       </DialogContent>

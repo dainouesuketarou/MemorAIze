@@ -52,24 +52,61 @@ const pickVoice = (lang: string): SpeechSynthesisVoice | null => {
   return v || null;
 };
 
+// 音声合成の状態管理
+let currentUtterance: SpeechSynthesisUtterance | null = null;
+let isSpeaking = false;
+
+/** 音声を停止 */
+export const stopSpeaking = () => {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return;
+  }
+  speechSynthesis.cancel();
+  currentUtterance = null;
+  isSpeaking = false;
+};
+
 /** テキストを音声で読み上げ */
 export const speak = (text: string) => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     return;
   }
 
-  speechSynthesis.cancel();
+  // 既存の音声を停止
+  stopSpeaking();
 
   const lang = detectLang(text);
   const utter = new SpeechSynthesisUtterance(text);
+  currentUtterance = utter;
   utter.lang = lang;
   utter.volume = 1;
-  utter.rate = 1;
+  utter.rate = 0.9; // 少し遅めに
   utter.pitch = 1;
 
-  utter.onstart = () => console.log('[TTS] onstart:', text);
-  utter.onend = () => console.log('[TTS] onend:', text);
-  utter.onerror = (e) => console.error('[TTS] onerror:', e);
+  utter.onstart = () => {
+    isSpeaking = true;
+    console.log('[TTS] onstart:', text);
+  };
+
+  utter.onend = () => {
+    isSpeaking = false;
+    currentUtterance = null;
+    console.log('[TTS] onend:', text);
+  };
+
+  utter.onerror = (e) => {
+    isSpeaking = false;
+    currentUtterance = null;
+    console.error('[TTS] onerror:', e);
+    // エラーが発生した場合、少し待ってから再試行
+    if (e.error === 'interrupted') {
+      setTimeout(() => {
+        if (!isSpeaking) {
+          speak(text);
+        }
+      }, 100);
+    }
+  };
 
   const voice = pickVoice(lang);
   if (voice) utter.voice = voice;
@@ -77,7 +114,9 @@ export const speak = (text: string) => {
   // voices がまだロードされていなければ待つ
   if (!speechSynthesis.getVoices().length) {
     const onVoicesChanged = () => {
-      speechSynthesis.speak(utter);
+      if (!isSpeaking) {
+        speechSynthesis.speak(utter);
+      }
       speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
     };
     speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);

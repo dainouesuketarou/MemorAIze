@@ -13,6 +13,12 @@ import { speakFrontOrBack } from '@/lib/speech';
 import { SettingModal } from '@/components/study/SettingModal';
 import { useDeckSetting } from '@/hooks/useDeckSetting';
 import { toast } from 'sonner';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import {
+  saveProgress,
+  clearProgress,
+} from '@/lib/store/slices/studyProgressSlice';
 
 /* ------------ 型 ------------ */
 type CardType = {
@@ -41,6 +47,10 @@ type TouchPosition = {
 export default function StudyPage() {
   const { deckId } = useParams();
   const router = useRouter();
+  const dispatch = useDispatch();
+  const studyProgress = useSelector(
+    (state: RootState) => state.studyProgress.progress[deckId as string],
+  );
 
   /* ---------- 全体状態 ---------- */
   const [groups, setGroups] = useState<Group[]>([]);
@@ -53,7 +63,9 @@ export default function StudyPage() {
   const [loading, setLoading] = useState(true);
 
   /* ---------- 学習フロー ---------- */
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(
+    studyProgress?.currentIndex ?? 0,
+  );
   const [showAnswer, setShowAnswer] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -204,8 +216,67 @@ export default function StudyPage() {
     }
   };
 
-  /* ====== 正解/不正解/学習完了（元実装を保持） ====== */
-  const handleCorrect = () => {
+  /* ====== 結果送信 & 完了 ====== */
+  const handleNext = useCallback(
+    async (finalResult?: boolean) => {
+      if (currentIndex >= totalCards - 1 && isTransitioning) return;
+      if (currentIndex < totalCards - 1) {
+        next();
+      } else {
+        setIsTransitioning(true);
+        next();
+
+        // 最後の1枚の結果を含めた結果を準備
+        let finalResults = studyResults;
+        if (typeof finalResult === 'boolean' && currentCard) {
+          finalResults = [
+            ...studyResults,
+            { id: currentCard.id, mastered: finalResult },
+          ];
+        }
+
+        // 並列でAPIリクエストを実行
+        const [resultResponse, historyResponse] = await Promise.all([
+          fetch(`/api/study/${deckId}/result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: finalResults }),
+          }),
+          fetch(`/api/study/${deckId}/history`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              progress: Math.round(((masteredCount + 1) / totalCards) * 100),
+            }),
+          }),
+        ]);
+
+        // エラーチェック
+        if (!resultResponse.ok || !historyResponse.ok) {
+          console.error('学習履歴の保存に失敗しました');
+        }
+
+        // 進捗をクリアしてリダイレクト
+        dispatch(clearProgress(deckId as string));
+        router.push(`/deck/${deckId}`);
+      }
+    },
+    [
+      currentIndex,
+      currentCard,
+      deckId,
+      dispatch,
+      isTransitioning,
+      masteredCount,
+      next,
+      router,
+      studyResults,
+      totalCards,
+    ],
+  );
+
+  /* ====== 正解/不正解/学習完了 ====== */
+  const handleCorrect = useCallback(() => {
     // 最後のカードで既に遷移中なら重複防止
     if (currentIndex >= totalCards - 1 && isTransitioning) return;
 
@@ -220,9 +291,16 @@ export default function StudyPage() {
     } else {
       handleNext(true);
     }
-  };
+  }, [
+    currentIndex,
+    currentCard,
+    isTransitioning,
+    totalCards,
+    next,
+    handleNext,
+  ]);
 
-  const handleIncorrect = () => {
+  const handleIncorrect = useCallback(() => {
     if (currentIndex >= totalCards - 1 && isTransitioning) return;
 
     setStudyResults((prev) => [
@@ -236,51 +314,14 @@ export default function StudyPage() {
     } else {
       handleNext(false);
     }
-  };
-
-  /* ====== 結果送信 & 完了 ====== */
-  const handleNext = async (finalResult?: boolean) => {
-    if (currentIndex >= totalCards - 1 && isTransitioning) return;
-    if (currentIndex < totalCards - 1) {
-      next();
-    } else {
-      setIsTransitioning(true);
-      next();
-
-      // 最後の1枚の結果を含めた結果を準備
-      let finalResults = studyResults;
-      if (typeof finalResult === 'boolean' && currentCard) {
-        finalResults = [
-          ...studyResults,
-          { id: currentCard.id, mastered: finalResult },
-        ];
-      }
-
-      // 並列でAPIリクエストを実行
-      const [resultResponse, historyResponse] = await Promise.all([
-        fetch(`/api/study/${deckId}/result`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ results: finalResults }),
-        }),
-        fetch(`/api/study/${deckId}/history`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            progress: Math.round(((masteredCount + 1) / totalCards) * 100),
-          }),
-        }),
-      ]);
-
-      // エラーチェック
-      if (!resultResponse.ok || !historyResponse.ok) {
-        console.error('学習履歴の保存に失敗しました');
-      }
-
-      // 即座にリダイレクト
-      router.push(`/deck/${deckId}`);
-    }
-  };
+  }, [
+    currentIndex,
+    currentCard,
+    isTransitioning,
+    totalCards,
+    next,
+    handleNext,
+  ]);
 
   /* ============ ドラッグ ============ */
   const handleDrag = useCallback(
