@@ -79,7 +79,7 @@ export default function BillingPage() {
   useEffect(() => {
     const fetchSubscription = async () => {
       try {
-        const response = await fetch('/api/subscription');
+        const response = await fetch('/api/subscription/status');
         if (!response.ok) {
           throw new Error('サブスクリプション情報の取得に失敗しました');
         }
@@ -98,49 +98,6 @@ export default function BillingPage() {
       fetchSubscription();
     }
   }, [session, dispatch]);
-
-  useEffect(() => {
-    const fetchPaymentMethods = async () => {
-      if (activeTab === 'payment') {
-        setIsLoadingPaymentMethods(true);
-        try {
-          if (!subscription?.stripeCustomerId) {
-            console.log('No stripeCustomerId found:', subscription);
-            setPaymentMethods([]);
-            return;
-          }
-
-          const response = await fetch('/api/subscription/payment-methods');
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Payment methods fetch error:', errorData);
-            throw new Error(
-              errorData.error || '支払い方法の取得に失敗しました',
-            );
-          }
-          const data = await response.json();
-          console.log('Fetched payment methods:', data);
-          setPaymentMethods(data.paymentMethods || []);
-        } catch (error) {
-          console.error('Error fetching payment methods:', error);
-          toast.error('支払い方法の取得に失敗しました');
-          setPaymentMethods([]);
-        } finally {
-          setIsLoadingPaymentMethods(false);
-        }
-      }
-    };
-
-    fetchPaymentMethods();
-  }, [activeTab, subscription]);
-
-  const handleUpgrade = async () => {
-    try {
-      router.push('/subscription');
-    } catch (error) {
-      toast.error('プラン選択ページへの遷移に失敗しました');
-    }
-  };
 
   const handleCancel = async () => {
     if (!subscription) return;
@@ -193,48 +150,6 @@ export default function BillingPage() {
     }
   };
 
-  const handleAddPaymentMethod = async () => {
-    try {
-      const response = await fetch('/api/subscription/create-payment-intent', {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('支払い方法の追加に失敗しました');
-      }
-
-      const { clientSecret } = await response.json();
-
-      window.location.href = `/payment/add?clientSecret=${clientSecret}`;
-    } catch (error) {
-      toast.error('支払い方法の追加に失敗しました');
-    }
-  };
-
-  const handleDeletePaymentMethod = async (paymentMethodId: string) => {
-    try {
-      const response = await fetch('/api/subscription/payment-methods', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ paymentMethodId }),
-      });
-
-      if (!response.ok) {
-        throw new Error('支払い方法の削除に失敗しました');
-      }
-
-      setPaymentMethods((prev) =>
-        prev.filter((method) => method.id !== paymentMethodId),
-      );
-
-      toast.success('支払い方法を削除しました');
-    } catch (error) {
-      toast.error('支払い方法の削除に失敗しました');
-    }
-  };
-
   const formatCardNumber = (last4: string) => `**** **** **** ${last4}`;
   const formatExpiryDate = (month: number, year: number) =>
     `${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
@@ -253,106 +168,6 @@ export default function BillingPage() {
     return endDate.toLocaleDateString('ja-JP');
   };
 
-  const renderPaymentMethods = () => {
-    if (isLoadingPaymentMethods) {
-      return (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
-
-    if (!subscription?.stripeCustomerId) {
-      return (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">
-            サブスクリプションを契約すると、支払い方法を管理できます
-          </p>
-          <Button
-            className="mt-4"
-            variant="outline"
-            onClick={() => router.push('/subscription')}
-          >
-            プランを選択
-          </Button>
-        </div>
-      );
-    }
-
-    if (!paymentMethods || paymentMethods.length === 0) {
-      return (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">
-            支払い方法が登録されていません
-          </p>
-          <Button
-            className="mt-4"
-            variant="outline"
-            onClick={handleAddPaymentMethod}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            支払い方法を追加
-          </Button>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {paymentMethods.map((method) => (
-          <div
-            key={method.id}
-            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center space-x-4">
-              <CreditCard className="w-6 h-6 text-muted-foreground" />
-              <div>
-                <p className="font-medium">
-                  {method.brand.charAt(0).toUpperCase() + method.brand.slice(1)}{' '}
-                  {formatCardNumber(method.last4)}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  有効期限: {formatExpiryDate(method.expMonth, method.expYear)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              {method.isDefault && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <Check className="w-3 h-3 mr-1" />
-                  デフォルト
-                </span>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-red-500 hover:text-red-600"
-                onClick={() => handleDeletePaymentMethod(method.id)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
-        <div className="flex justify-between items-center pt-4">
-          <Button
-            variant="outline"
-            onClick={handleAddPaymentMethod}
-            className="flex items-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            新しい支払い方法を追加
-          </Button>
-          {paymentMethods.length > 1 && (
-            <p className="text-sm text-muted-foreground">
-              複数の支払い方法を登録できます
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -367,117 +182,6 @@ export default function BillingPage() {
     isProPlan &&
     subscription?.status === 'ACTIVE' &&
     !subscription?.cancelAtPeriodEnd;
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'overview':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>現在のプラン</CardTitle>
-                <CardDescription>
-                  {subscription?.plan === 'PRO_MONTHLY'
-                    ? 'プロプラン（月額）'
-                    : subscription?.plan === 'PRO_YEARLY'
-                    ? 'プロプラン（年額）'
-                    : '無料プラン'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">ステータス</span>
-                    <span className="font-medium">
-                      {subscription?.status === 'ACTIVE'
-                        ? subscription?.cancelAtPeriodEnd
-                          ? 'キャンセル済み（利用中）'
-                          : '有効'
-                        : subscription?.status === 'CANCELED'
-                        ? 'キャンセル済み'
-                        : subscription?.status === 'PAST_DUE'
-                        ? '支払い期限切れ'
-                        : subscription?.status === 'TRIALING'
-                        ? 'トライアル中'
-                        : '無効'}
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">
-                      {subscription?.status === 'CANCELED'
-                        ? '利用可能期限'
-                        : '次回請求日'}
-                    </span>
-                    <span className="font-medium">
-                      {subscription?.status === 'CANCELED'
-                        ? getSubscriptionEndDate(
-                            subscription?.stripeCurrentPeriodEnd,
-                          )
-                        : formatDate(subscription?.stripeCurrentPeriodEnd)}
-                    </span>
-                  </div>
-                  {subscription?.status === 'CANCELED' && (
-                    <div className="text-sm text-muted-foreground">
-                      現在のプランは
-                      {formatDate(subscription?.stripeCurrentPeriodEnd)}
-                      まで利用可能です
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push('/subscription')}
-                >
-                  プランを変更
-                </Button>
-                {canCancel && (
-                  <Button variant="destructive" onClick={handleCancel}>
-                    キャンセル
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          </div>
-        );
-      case 'payment':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>支払い方法</CardTitle>
-                <CardDescription>
-                  現在の支払い方法を管理できます
-                </CardDescription>
-              </CardHeader>
-              <CardContent>{renderPaymentMethods()}</CardContent>
-            </Card>
-          </div>
-        );
-      case 'usage':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>利用状況</CardTitle>
-                <CardDescription>
-                  プランの利用状況を確認できます
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  利用状況の表示機能は現在開発中です
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-primary/5">
