@@ -27,6 +27,9 @@ type DragState = {
   isDragging: boolean;
   direction: 'left' | 'right' | null;
   offset: number;
+  rotation: number;
+  scale: number;
+  opacity: number;
 };
 
 type TouchPosition = {
@@ -76,6 +79,9 @@ export default function StudyPage() {
     isDragging: false,
     direction: null,
     offset: 0,
+    rotation: 0,
+    scale: 1,
+    opacity: 1,
   });
   const dragTimeoutRef = useRef<NodeJS.Timeout>();
   const touchStartPosRef = useRef<TouchPosition | null>(null);
@@ -270,7 +276,14 @@ export default function StudyPage() {
   /* ============ ドラッグ ============ */
   const handleDragStart = useCallback((clientX: number) => {
     touchStartPosRef.current = { clientX, clientY: 0 };
-    setDragState({ isDragging: true, direction: null, offset: 0 });
+    setDragState({
+      isDragging: true,
+      direction: null,
+      offset: 0,
+      rotation: 0,
+      scale: 1,
+      opacity: 1,
+    });
   }, []);
 
   const handleDrag = useCallback(
@@ -279,6 +292,17 @@ export default function StudyPage() {
 
       const offset = clientX - touchStartPosRef.current.clientX;
       const direction = offset < 0 ? 'left' : 'right';
+      const absOffset = Math.abs(offset);
+      const maxOffset = 200; // 最大ドラッグ距離
+
+      // 回転角度の計算（最大30度）
+      const rotation = (offset / maxOffset) * 30;
+
+      // スケールの計算（ドラッグに応じて少し小さくなる）
+      const scale = 1 - (absOffset / maxOffset) * 0.1;
+
+      // 不透明度の計算（ドラッグに応じて少し透明になる）
+      const opacity = 1 - (absOffset / maxOffset) * 0.2;
 
       // 状態更新をスロットリング
       if (dragTimeoutRef.current) {
@@ -289,7 +313,10 @@ export default function StudyPage() {
         setDragState((prev) => ({
           ...prev,
           direction,
-          offset: Math.min(Math.max(offset, -100), 100),
+          offset: Math.min(Math.max(offset, -maxOffset), maxOffset),
+          rotation,
+          scale,
+          opacity,
         }));
       }, 16); // 約60fps
     },
@@ -306,18 +333,44 @@ export default function StudyPage() {
 
     const threshold = 100;
     if (Math.abs(dragState.offset) > threshold) {
-      if (dragState.direction === 'left') {
-        handleIncorrect();
-      } else {
-        handleCorrect();
-      }
-    }
+      // アニメーション付きでカードをスワイプアウト
+      setDragState((prev) => ({
+        ...prev,
+        offset:
+          prev.direction === 'left' ? -window.innerWidth : window.innerWidth,
+        opacity: 0,
+      }));
 
-    // アニメーション用の状態をリセット
-    requestAnimationFrame(() => {
-      setDragState({ isDragging: false, direction: null, offset: 0 });
+      // アニメーション完了後に判定を実行
+      setTimeout(() => {
+        if (dragState.direction === 'left') {
+          handleIncorrect();
+        } else {
+          handleCorrect();
+        }
+        // 状態をリセット
+        setDragState({
+          isDragging: false,
+          direction: null,
+          offset: 0,
+          rotation: 0,
+          scale: 1,
+          opacity: 1,
+        });
+        touchStartPosRef.current = null;
+      }, 300);
+    } else {
+      // スワイプが不十分な場合は元の位置に戻る
+      setDragState({
+        isDragging: false,
+        direction: null,
+        offset: 0,
+        rotation: 0,
+        scale: 1,
+        opacity: 1,
+      });
       touchStartPosRef.current = null;
-    });
+    }
   }, [
     dragState.isDragging,
     dragState.direction,
@@ -438,19 +491,28 @@ export default function StudyPage() {
               handleDrag(touch.clientX);
             }}
             onTouchEnd={() => handleDragEnd()}
+            onMouseDown={(e) => {
+              handleDragStart(e.clientX);
+            }}
+            onMouseMove={(e) => {
+              handleDrag(e.clientX);
+            }}
+            onMouseUp={() => handleDragEnd()}
+            onMouseLeave={() => handleDragEnd()}
           >
             <Card
               className={cn(
-                'relative flex items-center justify-center p-4 sm:p-8 cursor-grab select-none min-h-[300px] sm:min-h-[500px] transition-transform duration-200 touch-none',
+                'relative flex items-center justify-center p-4 sm:p-8 cursor-grab select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
                 dragState.isDragging && 'cursor-grabbing',
-                dragState.direction === 'left' && 'rotate-[-5deg]',
-                dragState.direction === 'right' && 'rotate-[5deg]',
               )}
               style={{
-                transform: dragState.isDragging
-                  ? `translateX(${dragState.offset}px)`
-                  : 'translateX(0)',
+                transform: `translateX(${dragState.offset}px) rotate(${dragState.rotation}deg) scale(${dragState.scale})`,
+                opacity: dragState.opacity,
                 touchAction: 'none',
+                transformOrigin: 'center center',
+                boxShadow: dragState.isDragging
+                  ? '0 10px 30px rgba(0, 0, 0, 0.2)'
+                  : '0 4px 6px rgba(0, 0, 0, 0.1)',
               }}
               onClick={() => setShowAnswer((p) => !p)}
             >
