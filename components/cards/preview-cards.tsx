@@ -101,16 +101,40 @@ export function PreviewCards({
     if (!onRegenerate) return;
     setIsRegenerating(true);
     try {
-      const regenerated = await onRegenerate(additionalInstructions);
-      commit(regenerated);
+      const response = await fetch('/api/cards/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cards: cards.map(({ front, back }) => ({ front, back })),
+          additionalInstructions,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'カードの改善に失敗しました');
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.data?.cards?.length) {
+        throw new Error('カードの改善に失敗しました');
+      }
+
+      commit(data.data.cards);
       toast({
-        title: 'カードを再生成しました',
-        description: 'AI によってカードが更新されました。',
+        title: 'カードを改善しました',
+        description: 'AIによってカードの内容が改善されました。',
       });
       setDialogOpen(false);
       setAdditionalInstructions('');
-    } catch (e) {
-      toast({ title: 'エラーが発生しました', variant: 'destructive' });
+    } catch (e: any) {
+      toast({
+        title: 'エラーが発生しました',
+        description: e.message,
+        variant: 'destructive',
+      });
     } finally {
       setIsRegenerating(false);
     }
