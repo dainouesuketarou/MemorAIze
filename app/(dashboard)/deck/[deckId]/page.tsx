@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { DeckEditForm } from '@/components/decks/deck-edit-form';
 import { Edit2 } from 'lucide-react';
+import { MathRenderer } from '@/components/common/MathRenderer';
 
 // 相対時間を計算する関数
 const getRelativeTime = (dateString: string) => {
@@ -201,7 +202,7 @@ export default function DeckDetailsPage() {
       <DashboardHeader
         heading={
           <span className="flex items-center">
-            {deckData.title}
+            <MathRenderer text={deckData.title} />
             <Button
               variant="ghost"
               size="icon"
@@ -212,7 +213,7 @@ export default function DeckDetailsPage() {
             </Button>
           </span>
         }
-        description={deckData.description}
+        description={<MathRenderer text={deckData.description} />}
       >
         <Link href="/dashboard">
           <Button variant="outline" className="h-10">
@@ -380,9 +381,18 @@ export default function DeckDetailsPage() {
 
       {/* ---------- デッキ編集モーダル ---------- */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent
+          className="max-w-lg"
+          aria-describedby="deck-edit-description"
+        >
           <DialogHeader>
             <DialogTitle>デッキ設定</DialogTitle>
+            <p
+              id="deck-edit-description"
+              className="text-sm text-muted-foreground"
+            >
+              デッキのタイトルと説明を編集できます。
+            </p>
           </DialogHeader>
 
           <DeckEditForm

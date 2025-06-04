@@ -19,6 +19,7 @@ import {
   saveProgress,
   clearProgress,
 } from '@/lib/store/slices/studyProgressSlice';
+import { MathRenderer } from '@/components/common/MathRenderer';
 
 /* ------------ 型 ------------ */
 type CardType = {
@@ -596,7 +597,7 @@ export default function StudyPage() {
                 </Button>
               </div>
               <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4">
-                {showAnswer ? back : front}
+                <MathRenderer text={showAnswer ? back : front} displayMode />
               </div>
             </Card>
           </div>

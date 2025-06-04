@@ -61,6 +61,10 @@ export const stopSpeaking = () => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     return;
   }
+  if (currentUtterance) {
+    currentUtterance.onend = null;
+    currentUtterance.onerror = null;
+  }
   speechSynthesis.cancel();
   currentUtterance = null;
   isSpeaking = false;
@@ -98,7 +102,13 @@ export const speak = (text: string) => {
     isSpeaking = false;
     currentUtterance = null;
     console.error('[TTS] onerror:', e);
-    // エラーが発生した場合、少し待ってから再試行
+
+    // canceledエラーの場合は再試行しない
+    if (e.error === 'canceled') {
+      return;
+    }
+
+    // その他のエラーの場合、少し待ってから再試行
     if (e.error === 'interrupted') {
       setTimeout(() => {
         if (!isSpeaking) {

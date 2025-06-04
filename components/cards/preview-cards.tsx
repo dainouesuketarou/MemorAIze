@@ -23,6 +23,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { MathRenderer } from '@/components/common/MathRenderer';
 
 interface PreviewCard {
   id: string;
@@ -272,7 +273,9 @@ export function PreviewCards({
                             <Volume2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         </div>
-                        <p className="text-lg font-medium">{card.front}</p>
+                        <div className="text-lg font-medium break-words">
+                          <MathRenderer text={card.front} />
+                        </div>
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-2">
@@ -287,7 +290,9 @@ export function PreviewCards({
                             <Volume2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         </div>
-                        <p className="text-lg font-medium">{card.back}</p>
+                        <div className="text-lg font-medium break-words">
+                          <MathRenderer text={card.back} />
+                        </div>
                       </div>
                     </>
                   )}
