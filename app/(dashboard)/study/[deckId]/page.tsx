@@ -246,7 +246,8 @@ export default function StudyPage() {
     } else {
       setIsTransitioning(true);
       next();
-      // 最後の1枚だけ送信
+
+      // 最後の1枚の結果を含めた結果を準備
       let finalResults = studyResults;
       if (typeof finalResult === 'boolean' && currentCard) {
         finalResults = [
@@ -254,55 +255,52 @@ export default function StudyPage() {
           { id: currentCard.id, mastered: finalResult },
         ];
       }
-      await fetch(`/api/study/${deckId}/result`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ results: finalResults }),
-      });
-      onStudyComplete();
-      setTimeout(() => router.push(`/deck/${deckId}`), 400);
+
+      // 並列でAPIリクエストを実行
+      const [resultResponse, historyResponse] = await Promise.all([
+        fetch(`/api/study/${deckId}/result`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ results: finalResults }),
+        }),
+        fetch(`/api/study/${deckId}/history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            progress: Math.round(((masteredCount + 1) / totalCards) * 100),
+          }),
+        }),
+      ]);
+
+      // エラーチェック
+      if (!resultResponse.ok || !historyResponse.ok) {
+        console.error('学習履歴の保存に失敗しました');
+      }
+
+      // 即座にリダイレクト
+      router.push(`/deck/${deckId}`);
     }
   };
 
-  const onStudyComplete = () => {
-    const pct = Math.round(((masteredCount + 1) / totalCards) * 100);
-    fetch(`/api/study/${deckId}/history`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ progress: pct }),
-    });
-  };
-
   /* ============ ドラッグ ============ */
-  const handleDragStart = useCallback((clientX: number) => {
-    touchStartPosRef.current = { clientX, clientY: 0 };
-    setDragState({
-      isDragging: true,
-      direction: null,
-      offset: 0,
-      rotation: 0,
-      scale: 1,
-      opacity: 1,
-    });
-  }, []);
-
   const handleDrag = useCallback(
-    (clientX: number) => {
+    (clientX: number, clientY: number) => {
       if (!dragState.isDragging || !touchStartPosRef.current) return;
 
-      const offset = clientX - touchStartPosRef.current.clientX;
-      const direction = offset < 0 ? 'left' : 'right';
-      const absOffset = Math.abs(offset);
-      const maxOffset = 200; // 最大ドラッグ距離
+      const offsetX = clientX - touchStartPosRef.current.clientX;
+      const offsetY = clientY - touchStartPosRef.current.clientY;
+      const direction = offsetX < 0 ? 'left' : 'right';
+      const absOffset = Math.abs(offsetX);
+      const maxOffset = 200;
 
-      // 回転角度の計算（最大30度）
-      const rotation = (offset / maxOffset) * 30;
+      // 回転角度の計算（最大15度に抑制）
+      const rotation = (offsetX / maxOffset) * 15;
 
-      // スケールの計算（ドラッグに応じて少し小さくなる）
-      const scale = 1 - (absOffset / maxOffset) * 0.1;
+      // スケールの計算（より控えめに）
+      const scale = 1 - (absOffset / maxOffset) * 0.05;
 
-      // 不透明度の計算（ドラッグに応じて少し透明になる）
-      const opacity = 1 - (absOffset / maxOffset) * 0.2;
+      // 不透明度の計算（より控えめに）
+      const opacity = 1 - (absOffset / maxOffset) * 0.1;
 
       // 状態更新をスロットリング
       if (dragTimeoutRef.current) {
@@ -313,15 +311,27 @@ export default function StudyPage() {
         setDragState((prev) => ({
           ...prev,
           direction,
-          offset: Math.min(Math.max(offset, -maxOffset), maxOffset),
+          offset: Math.min(Math.max(offsetX, -maxOffset), maxOffset),
           rotation,
           scale,
           opacity,
         }));
-      }, 16); // 約60fps
+      }, 16);
     },
     [dragState.isDragging],
   );
+
+  const handleDragStart = useCallback((clientX: number, clientY: number) => {
+    touchStartPosRef.current = { clientX, clientY };
+    setDragState({
+      isDragging: true,
+      direction: null,
+      offset: 0,
+      rotation: 0,
+      scale: 1,
+      opacity: 1,
+    });
+  }, []);
 
   const handleDragEnd = useCallback(() => {
     if (!dragState.isDragging) return;
@@ -484,18 +494,18 @@ export default function StudyPage() {
             className="relative flex-1"
             onTouchStart={(e) => {
               const touch = e.touches[0];
-              handleDragStart(touch.clientX);
+              handleDragStart(touch.clientX, touch.clientY);
             }}
             onTouchMove={(e) => {
               const touch = e.touches[0];
-              handleDrag(touch.clientX);
+              handleDrag(touch.clientX, touch.clientY);
             }}
             onTouchEnd={() => handleDragEnd()}
             onMouseDown={(e) => {
-              handleDragStart(e.clientX);
+              handleDragStart(e.clientX, e.clientY);
             }}
             onMouseMove={(e) => {
-              handleDrag(e.clientX);
+              handleDrag(e.clientX, e.clientY);
             }}
             onMouseUp={() => handleDragEnd()}
             onMouseLeave={() => handleDragEnd()}
@@ -506,12 +516,16 @@ export default function StudyPage() {
                 dragState.isDragging && 'cursor-grabbing',
               )}
               style={{
-                transform: `translateX(${dragState.offset}px) rotate(${dragState.rotation}deg) scale(${dragState.scale})`,
+                transform: `translate(${dragState.offset}px, ${
+                  dragState.offset * 0.1
+                }px) rotate(${dragState.rotation}deg) scale(${
+                  dragState.scale
+                })`,
                 opacity: dragState.opacity,
                 touchAction: 'none',
                 transformOrigin: 'center center',
                 boxShadow: dragState.isDragging
-                  ? '0 10px 30px rgba(0, 0, 0, 0.2)'
+                  ? '0 10px 20px rgba(0, 0, 0, 0.15)'
                   : '0 4px 6px rgba(0, 0, 0, 0.1)',
               }}
               onClick={() => setShowAnswer((p) => !p)}

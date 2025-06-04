@@ -16,7 +16,13 @@ import { setSubscription } from '@/lib/store/slices/userSlice';
  * ヘッダー用のコンパクト表示
  * 残り 10 % 未満で文字色を赤系に
  */
-export function AiLimitBadge({ className }: { className?: string }) {
+export function AiLimitBadge({
+  className,
+  hideInStudy = false,
+}: {
+  className?: string;
+  hideInStudy?: boolean;
+}) {
   const { limit, loading } = useAiGenerationLimit();
   const subscription = useSelector(
     (state: RootState) => state.user.subscription,
@@ -43,7 +49,11 @@ export function AiLimitBadge({ className }: { className?: string }) {
     };
 
     fetchSubscription();
-  }, []);
+  }, [dispatch]);
+
+  // 学習画面では表示しない
+  if (hideInStudy) return null;
+
   const isProUser =
     subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';
 
