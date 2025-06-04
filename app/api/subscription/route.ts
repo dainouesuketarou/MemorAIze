@@ -294,21 +294,21 @@ export async function POST(req: Request) {
       create: {
         userId: user.id,
         stripeSubscriptionId: newSubscription.id,
-        stripePriceId: requestedPriceId as string, // requestedPriceId は顧客が選んだもの
+        stripePriceId: requestedPriceId as string,
         status: initialStatusDb,
         stripeCurrentPeriodEnd: stripeCurrentPeriodEndForDb,
-        plan: planTypeDb, // ★★★ planTypeDb
+        plan: user.subscription?.plan || 'FREE', // 既存のプランを維持
       },
       update: {
         stripeSubscriptionId: newSubscription.id,
         stripePriceId: requestedPriceId as string,
         status: initialStatusDb,
         stripeCurrentPeriodEnd: stripeCurrentPeriodEndForDb,
-        plan: planTypeDb, // ★★★ planTypeDb
+        // プランは更新しない
       },
     });
     console.log(
-      `Subscription DB upserted for user ${user.id} with plan: ${planTypeDb}`,
+      `Subscription DB upserted for user ${user.id} with status: ${initialStatusDb}`,
     );
 
     return NextResponse.json({
@@ -333,45 +333,5 @@ export async function POST(req: Request) {
       );
     }
     return new NextResponse(errorMessage, { status: 500 });
-  }
-}
-
-export async function GET() {
-  try {
-    const session = await getAuthSession();
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: {
-        subscription: {
-          select: {
-            id: true,
-            plan: true,
-            status: true,
-            stripeSubscriptionId: true,
-            stripePriceId: true,
-            stripeCurrentPeriodEnd: true,
-          },
-        },
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json(user.subscription);
-  } catch (error) {
-    console.error('サブスクリプション情報の取得に失敗しました:', error);
-    return NextResponse.json(
-      { error: 'サブスクリプション情報の取得に失敗しました' },
-      { status: 500 },
-    );
   }
 }

@@ -74,12 +74,31 @@ export async function POST(req: Request) {
           subscription: string;
         };
         if (invoice.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(
+            invoice.subscription,
+          );
+          const priceId = subscription.items.data[0].price.id;
+          let plan: 'FREE' | 'PRO_MONTHLY' | 'PRO_YEARLY';
+
+          if (priceId === process.env.STRIPE_FREE_PRICE_ID) {
+            plan = 'FREE';
+          } else if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
+            plan = 'PRO_MONTHLY';
+          } else if (priceId === process.env.STRIPE_PRO_YEARLY_PRICE_ID) {
+            plan = 'PRO_YEARLY';
+          } else {
+            console.error(`Unknown price ID: ${priceId}`);
+            return new NextResponse('Unknown price ID', { status: 400 });
+          }
+
           await prisma.subscription.update({
             where: {
               stripeSubscriptionId: invoice.subscription,
             },
             data: {
               status: 'ACTIVE',
+              plan: plan,
+              stripePriceId: priceId,
             },
           });
         }
