@@ -20,6 +20,7 @@ import {
   clearProgress,
 } from '@/lib/store/slices/studyProgressSlice';
 import { MathRenderer } from '@/components/common/MathRenderer';
+import { MathText } from '@/components/common/MathText';
 
 /* ------------ 型 ------------ */
 type CardType = {
@@ -513,6 +514,7 @@ export default function StudyPage() {
       </div>
 
       {/* カード部分 */}
+      <style>{cardFlipStyles}</style>
       <div className="w-full relative">
         <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr_120px] gap-4 min-h-[400px] sm:h-[500px]">
           {/* PC表示時の左ボタン */}
@@ -529,77 +531,95 @@ export default function StudyPage() {
             {showAnswer ? '不正解' : '分からない'}
           </Button>
 
-          {/* カード */}
+          {/* カード本体 */}
           <div
-            className="relative flex-1"
-            onTouchStart={(e) => {
-              const touch = e.touches[0];
-              handleDragStart(touch.clientX, touch.clientY);
-            }}
-            onTouchMove={(e) => {
-              const touch = e.touches[0];
-              handleDrag(touch.clientX, touch.clientY);
-            }}
-            onTouchEnd={() => handleDragEnd()}
-            onMouseDown={(e) => {
-              handleDragStart(e.clientX, e.clientY);
-            }}
-            onMouseMove={(e) => {
-              handleDrag(e.clientX, e.clientY);
-            }}
-            onMouseUp={() => handleDragEnd()}
-            onMouseLeave={() => handleDragEnd()}
+            className={cn(
+              'relative flex-1 study-flip-card',
+              showAnswer && 'flipped',
+            )}
+            style={{ minHeight: '300px', height: '100%' }}
+            onClick={() => setShowAnswer((p) => !p)}
           >
-            <Card
-              className={cn(
-                'relative flex items-center justify-center p-4 sm:p-8 cursor-grab select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
-                dragState.isDragging && 'cursor-grabbing',
-              )}
-              style={{
-                transform: `translate(${dragState.offset}px, ${
-                  dragState.offset * 0.1
-                }px) rotate(${dragState.rotation}deg) scale(${
-                  dragState.scale
-                })`,
-                opacity: dragState.opacity,
-                touchAction: 'none',
-                transformOrigin: 'center center',
-                boxShadow: dragState.isDragging
-                  ? '0 10px 20px rgba(0, 0, 0, 0.15)'
-                  : '0 4px 6px rgba(0, 0, 0, 0.1)',
-              }}
-              onClick={() => setShowAnswer((p) => !p)}
+            <div
+              className="study-flip-inner"
+              style={{ width: '100%', height: '100%' }}
             >
-              {/* ドラッグ中の方向インジケーター */}
-              {dragState.isDragging && (
-                <div
-                  className={cn(
-                    'absolute inset-0 rounded-lg transition-opacity duration-200',
-                    dragState.direction === 'left'
-                      ? 'bg-red-500/20'
-                      : dragState.direction === 'right'
-                      ? 'bg-green-500/20'
-                      : 'bg-transparent',
-                  )}
-                />
-              )}
-              <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    speakFrontOrBack(currentCard, showAnswer, setting?.reverse);
-                  }}
-                >
-                  <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
-                </Button>
-              </div>
-              <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4">
-                <MathRenderer text={showAnswer ? back : front} displayMode />
-              </div>
-            </Card>
+              {/* 表 */}
+              <Card
+                className={cn(
+                  'study-flip-front relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
+                  dragState.isDragging && 'cursor-grabbing',
+                )}
+                style={{
+                  transformOrigin: 'center center',
+                  boxShadow: dragState.isDragging
+                    ? '0 10px 20px rgba(0, 0, 0, 0.15)'
+                    : '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  height: '100%',
+                }}
+              >
+                {/* ドラッグ中の方向インジケーター */}
+                {dragState.isDragging && (
+                  <div
+                    className={cn(
+                      'absolute inset-0 rounded-lg transition-opacity duration-200',
+                      dragState.direction === 'left'
+                        ? 'bg-red-500/20'
+                        : dragState.direction === 'right'
+                        ? 'bg-green-500/20'
+                        : 'bg-transparent',
+                    )}
+                  />
+                )}
+                <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speakFrontOrBack(currentCard, false, setting?.reverse);
+                    }}
+                  >
+                    <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </Button>
+                </div>
+                <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
+                  <MathText text={front} />
+                </div>
+              </Card>
+              {/* 裏 */}
+              <Card
+                className={cn(
+                  'study-flip-back relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
+                  dragState.isDragging && 'cursor-grabbing',
+                )}
+                style={{
+                  transformOrigin: 'center center',
+                  boxShadow: dragState.isDragging
+                    ? '0 10px 20px rgba(0, 0, 0, 0.15)'
+                    : '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  height: '100%',
+                }}
+              >
+                <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speakFrontOrBack(currentCard, true, setting?.reverse);
+                    }}
+                  >
+                    <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </Button>
+                </div>
+                <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
+                  <MathText text={back} />
+                </div>
+              </Card>
+            </div>
           </div>
 
           {/* PC表示時の右ボタン */}
@@ -688,3 +708,63 @@ export default function StudyPage() {
     </DashboardShell>
   );
 }
+
+/* カードフリップ用CSS（UI・レイアウトは変更しない）
+.study-flip-card {
+  perspective: 1200px;
+}
+.study-flip-inner {
+  transition: transform 0.5s cubic-bezier(0.4,0.2,0.2,1);
+  transform-style: preserve-3d;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.study-flip-card.flipped .study-flip-inner {
+  transform: rotateY(180deg);
+}
+.study-flip-front, .study-flip-back {
+  backface-visibility: hidden;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0; left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.study-flip-back {
+  transform: rotateY(180deg);
+}
+*/
+
+const cardFlipStyles = `
+  .study-flip-card {
+    perspective: 1200px;
+  }
+  .study-flip-inner {
+    transition: transform 0.5s cubic-bezier(0.4,0.2,0.2,1);
+    transform-style: preserve-3d;
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .study-flip-card.flipped .study-flip-inner {
+    transform: rotateY(180deg);
+  }
+  .study-flip-front, .study-flip-back {
+    backface-visibility: hidden;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0; left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .study-flip-back {
+    transform: rotateY(180deg);
+  }
+`;

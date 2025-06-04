@@ -36,6 +36,7 @@ import { DeckEditForm } from '@/components/decks/deck-edit-form';
 import { toast } from 'sonner';
 import { speak } from '@/lib/speech';
 import { MathRenderer } from '@/components/common/MathRenderer';
+import { MathText } from '@/components/common/MathText';
 
 export default function CardsPage() {
   const router = useRouter();
@@ -232,7 +233,7 @@ export default function CardsPage() {
                         </Button>
                       </div>
                       <div className="text-lg font-medium break-words">
-                        <MathRenderer text={card.front} />
+                        <MathText text={card.front} />
                       </div>
                     </div>
 
@@ -250,7 +251,7 @@ export default function CardsPage() {
                         </Button>
                       </div>
                       <div className="text-lg font-medium break-words">
-                        <MathRenderer text={card.back} />
+                        <MathText text={card.back} />
                       </div>
                     </div>
                   </div>
