@@ -87,7 +87,7 @@ export function LandingHero() {
             </div>
           </div>
           <div className="flex justify-center" aria-label="AI機能のデモ">
-            <div className="relative w-full max-w-[500px] aspect-square">
+            <div className="relative w-full max-w-[500px] h-auto min-h-[420px] lg:aspect-square">
               <div
                 className="absolute w-full h-full bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-3xl transform -rotate-6 scale-95"
                 aria-hidden="true"
