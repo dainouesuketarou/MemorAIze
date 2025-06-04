@@ -268,29 +268,53 @@ export default function StudyPage() {
         ];
       }
 
-      // 並列でAPIリクエストを実行
-      const [resultResponse, historyResponse] = await Promise.all([
-        fetch(`/api/study/${deckId}/result`, {
+      try {
+        // 学習結果を保存
+        const resultResponse = await fetch(`/api/study/${deckId}/result`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ results: finalResults }),
-        }),
-        fetch(`/api/study/${deckId}/history`, {
+        });
+
+        if (!resultResponse.ok) {
+          throw new Error('学習結果の保存に失敗しました');
+        }
+
+        // 学習履歴を保存
+        // 正解したカードの割合を計算
+        const correctCount = finalResults.filter((r) => r.mastered).length;
+        const progressPercentage = Math.round(
+          (correctCount / totalCards) * 100,
+        );
+
+        const historyResponse = await fetch(`/api/study/${deckId}/history`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            progress: Math.round(((masteredCount + 1) / totalCards) * 100),
+            progress: progressPercentage,
+            completedAt: new Date().toISOString(),
+            totalCards,
+            correctCount,
+            incorrectCount: totalCards - correctCount,
           }),
-        }),
-      ]);
+        });
 
-      // エラーチェック
-      if (!resultResponse.ok || !historyResponse.ok) {
-        console.error('学習履歴の保存に失敗しました');
+        if (!historyResponse.ok) {
+          throw new Error('学習履歴の保存に失敗しました');
+        }
+
+        // 進捗をクリア
+        dispatch(clearProgress(deckId as string));
+
+        // 少し待ってからリダイレクト（ローディング表示のため）
+        setTimeout(() => {
+          router.push(`/deck/${deckId}`);
+        }, 1000);
+      } catch (error) {
+        console.error('学習データの保存に失敗しました:', error);
+        toast.error('学習データの保存に失敗しました');
+        setIsTransitioning(false);
       }
-
-      // 即座にリダイレクト
-      router.push(`/deck/${deckId}`);
     }
   };
 
@@ -411,7 +435,7 @@ export default function StudyPage() {
   }, []);
 
   /* ============ ローディング / 0枚 ============ */
-  if (loading)
+  if (loading || isTransitioning)
     return (
       <DashboardShell
         groups={groups}
@@ -420,8 +444,11 @@ export default function StudyPage() {
         groupMode={groupMode}
         setGroupMode={setGroupMode}
       >
-        <div className="flex items-center justify-center h-[80vh] text-lg text-muted-foreground">
-          カードを取得中...
+        <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-lg text-muted-foreground">
+            {isTransitioning ? '学習結果を保存中...' : 'カードを取得中...'}
+          </p>
         </div>
       </DashboardShell>
     );

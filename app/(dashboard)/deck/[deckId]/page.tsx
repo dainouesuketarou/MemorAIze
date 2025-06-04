@@ -150,76 +150,11 @@ export default function DeckDetailsPage() {
   ).length;
   const learnedCount = masteredCount + strugglingCount;
 
-  // 円グラフ用の進捗計算
-  const pieMasteredPercentage =
-    pieProgressMode === 'all'
-      ? totalCards > 0
-        ? Math.round((masteredCount / totalCards) * 100)
-        : 0
-      : learnedCount > 0
-      ? Math.round((masteredCount / learnedCount) * 100)
-      : 0;
-  const pieStrugglingPercentage =
-    pieProgressMode === 'all'
-      ? totalCards > 0
-        ? Math.round((strugglingCount / totalCards) * 100)
-        : 0
-      : learnedCount > 0
-      ? Math.round((strugglingCount / learnedCount) * 100)
-      : 0;
-  const pieUnlearnedPercentage =
-    pieProgressMode === 'all'
-      ? totalCards > 0
-        ? Math.round((unlearnedCount / totalCards) * 100)
-        : 0
-      : 0;
-
-  const pieData =
-    pieProgressMode === 'all'
-      ? [
-          {
-            name: '覚えた',
-            value: masteredCount,
-            color: '#4ade80',
-          },
-          {
-            name: '苦手',
-            value: strugglingCount,
-            color: '#f87171',
-          },
-          {
-            name: '未学習',
-            value: unlearnedCount,
-            color: '#9ca3af',
-          },
-        ]
-      : [
-          {
-            name: '覚えた',
-            value: masteredCount,
-            color: '#4ade80',
-          },
-          {
-            name: '苦手',
-            value: strugglingCount,
-            color: '#f87171',
-          },
-        ];
-
   // グラフデータの準備
   const chartData = deckData.progressHistory
     .map((history: StudyHistory) => {
-      const totalCards = deckData.cards.length;
-      const masteredCount = deckData.cards.filter(
-        (card: { status: string }) => card.status === 'MASTERED',
-      ).length;
-      const strugglingCount = deckData.cards.filter(
-        (card: { status: string }) => card.status === 'STRUGGLING',
-      ).length;
-      const learnedCount = masteredCount + strugglingCount;
-
-      // グラフ用の進捗計算
-      const progress = totalCards > 0 ? history.progress : 0;
+      // 履歴データから直接進捗率を取得
+      const progress = history.progress;
 
       return {
         ...history,
@@ -228,6 +163,32 @@ export default function DeckDetailsPage() {
       };
     })
     .reverse();
+
+  // 円グラフ用の進捗計算
+  const pieMasteredPercentage =
+    totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0;
+  const pieStrugglingPercentage =
+    totalCards > 0 ? Math.round((strugglingCount / totalCards) * 100) : 0;
+  const pieUnlearnedPercentage =
+    totalCards > 0 ? Math.round((unlearnedCount / totalCards) * 100) : 0;
+
+  const pieData = [
+    {
+      name: '覚えた',
+      value: masteredCount,
+      color: '#4ade80',
+    },
+    {
+      name: '苦手',
+      value: strugglingCount,
+      color: '#f87171',
+    },
+    {
+      name: '未学習',
+      value: unlearnedCount,
+      color: '#9ca3af',
+    },
+  ];
 
   return (
     <DashboardShell
