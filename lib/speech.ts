@@ -76,62 +76,31 @@ export const speak = (text: string) => {
     return;
   }
 
-  // 既存の音声を停止
   stopSpeaking();
 
   const lang = detectLang(text);
   const utter = new SpeechSynthesisUtterance(text);
-  currentUtterance = utter;
   utter.lang = lang;
   utter.volume = 1;
-  utter.rate = 0.9; // 少し遅めに
+  utter.rate = 0.9;
   utter.pitch = 1;
 
-  utter.onstart = () => {
-    isSpeaking = true;
-    console.log('[TTS] onstart:', text);
+  const setVoiceAndSpeak = () => {
+    const voice = pickVoice(lang);
+    if (voice) utter.voice = voice;
+    speechSynthesis.speak(utter);
   };
 
-  utter.onend = () => {
-    isSpeaking = false;
-    currentUtterance = null;
-    console.log('[TTS] onend:', text);
-  };
-
-  utter.onerror = (e) => {
-    isSpeaking = false;
-    currentUtterance = null;
-    console.error('[TTS] onerror:', e);
-
-    // canceledエラーの場合は再試行しない
-    if (e.error === 'canceled') {
-      return;
-    }
-
-    // その他のエラーの場合、少し待ってから再試行
-    if (e.error === 'interrupted') {
-      setTimeout(() => {
-        if (!isSpeaking) {
-          speak(text);
-        }
-      }, 100);
-    }
-  };
-
-  const voice = pickVoice(lang);
-  if (voice) utter.voice = voice;
-
-  // voices がまだロードされていなければ待つ
   if (!speechSynthesis.getVoices().length) {
     const onVoicesChanged = () => {
-      if (!isSpeaking) {
-        speechSynthesis.speak(utter);
-      }
+      setVoiceAndSpeak();
       speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
     };
     speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+    // getVoices()を呼んでロードを促す
+    speechSynthesis.getVoices();
   } else {
-    speechSynthesis.speak(utter);
+    setVoiceAndSpeak();
   }
 };
 
@@ -150,3 +119,15 @@ export const speakFrontOrBack = (
     : card.front;
   speak(text);
 };
+
+/** LaTeXや強調記号を除去してTTS用のプレーンテキストを返す */
+export function extractPlainText(text: string): string {
+  // console.log('extractPlainText', text);
+  // $$...$$, $...$ のLaTeX数式を空文字に
+  let plain = text.replace(/\$\$[^$]+\$\$/g, '').replace(/\$[^$]+\$/g, '');
+  // **...** の強調記号を除去
+  plain = plain.replace(/\*\*([^*]+)\*\*/g, '$1');
+  // console.log('plain', plain);
+  // その他、余分な空白をtrim
+  return plain.trim();
+}

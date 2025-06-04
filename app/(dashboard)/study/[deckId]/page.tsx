@@ -9,7 +9,7 @@ import { Star, Volume2, Cog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Group, FilterMode } from '@prisma/client';
 import { DeckWithCardsAndGroups } from '@/types/deck';
-import { speakFrontOrBack } from '@/lib/speech';
+import { speakFrontOrBack, extractPlainText, speak } from '@/lib/speech';
 import { SettingModal } from '@/components/study/SettingModal';
 import { useDeckSetting } from '@/hooks/useDeckSetting';
 import { toast } from 'sonner';
@@ -436,6 +436,12 @@ export default function StudyPage() {
     };
   }, []);
 
+  /* ============ 再スタート用ハンドラ ============ */
+  const handleRestart = () => {
+    setCurrentIndex(0);
+    setShowAnswer(false);
+  };
+
   /* ============ ローディング / 0枚 ============ */
   if (loading || isTransitioning)
     return (
@@ -503,6 +509,13 @@ export default function StudyPage() {
             >
               終了
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleRestart}
+              className="rounded-full px-4 sm:px-6"
+            >
+              再スタート
+            </Button>
           </div>
         </div>
         <div className="h-2 rounded-full overflow-hidden bg-muted">
@@ -539,6 +552,23 @@ export default function StudyPage() {
             )}
             style={{ minHeight: '300px', height: '100%' }}
             onClick={() => setShowAnswer((p) => !p)}
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              handleDragStart(touch.clientX, touch.clientY);
+            }}
+            onTouchMove={(e) => {
+              const touch = e.touches[0];
+              handleDrag(touch.clientX, touch.clientY);
+            }}
+            onTouchEnd={() => handleDragEnd()}
+            onMouseDown={(e) => {
+              handleDragStart(e.clientX, e.clientY);
+            }}
+            onMouseMove={(e) => {
+              handleDrag(e.clientX, e.clientY);
+            }}
+            onMouseUp={() => handleDragEnd()}
+            onMouseLeave={() => handleDragEnd()}
           >
             <div
               className="study-flip-inner"
@@ -578,7 +608,7 @@ export default function StudyPage() {
                     className="rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
-                      speakFrontOrBack(currentCard, false, setting?.reverse);
+                      speak(extractPlainText(front));
                     }}
                   >
                     <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -609,7 +639,7 @@ export default function StudyPage() {
                     className="rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
-                      speakFrontOrBack(currentCard, true, setting?.reverse);
+                      speak(extractPlainText(back));
                     }}
                   >
                     <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />

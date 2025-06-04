@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { speak } from '@/lib/speech';
+import { speak, extractPlainText } from '@/lib/speech';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
 import {
@@ -208,7 +208,7 @@ export function PreviewCards({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => speak(card.front)}
+                            onClick={() => speak(extractPlainText(card.front))}
                           >
                             <Volume2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
@@ -231,7 +231,7 @@ export function PreviewCards({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => speak(card.back)}
+                            onClick={() => speak(extractPlainText(card.back))}
                           >
                             <Volume2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
@@ -269,7 +269,7 @@ export function PreviewCards({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => speak(card.front)}
+                            onClick={() => speak(extractPlainText(card.front))}
                           >
                             <Volume2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
@@ -286,7 +286,7 @@ export function PreviewCards({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => speak(card.back)}
+                            onClick={() => speak(extractPlainText(card.back))}
                           >
                             <Volume2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
@@ -305,10 +305,13 @@ export function PreviewCards({
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent
+          className="sm:max-w-lg"
+          aria-describedby="refresh-dialog-description"
+        >
           <DialogHeader>
             <DialogTitle>カードをブラッシュアップ</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="refresh-dialog-description">
               追加の指示を入力して、カードの内容を改善できます。
             </DialogDescription>
           </DialogHeader>

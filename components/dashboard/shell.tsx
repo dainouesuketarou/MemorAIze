@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Deck, Group } from '@prisma/client';
 import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { AiLimitBadge } from '@/components/dashboard/ai-limit-badge';
 import { Loading } from '../loading';
@@ -71,6 +71,8 @@ export function DashboardShell({
   const [limit, setLimit] = useState<AiGenerationLimit | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
+  const isDashboardPage = pathname === '/dashboard';
 
   // スクロールイベントの最適化
   useEffect(() => {
@@ -223,20 +225,22 @@ export function DashboardShell({
           />
 
           <div className="flex-1 justify-center px-4 lg:px-8">
-            <div className="relative w-full max-w-md">
-              <div className="hidden lg:block relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="暗記カード帳を検索..."
-                  className="w-full pl-9 bg-muted"
-                  value={searchQuery}
-                  onChange={handleSearch}
-                  onFocus={() => setShowResults(true)}
-                />
+            {isDashboardPage && (
+              <div className="relative w-full max-w-md">
+                <div className="hidden lg:block relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="暗記カード帳を検索..."
+                    className="w-full pl-9 bg-muted"
+                    value={searchQuery}
+                    onChange={handleSearch}
+                    onFocus={() => setShowResults(true)}
+                  />
+                </div>
+                {renderSearchResults}
               </div>
-              {renderSearchResults}
-            </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

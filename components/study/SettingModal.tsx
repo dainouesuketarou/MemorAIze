@@ -67,12 +67,6 @@ export function SettingModal({
     [onSave],
   );
 
-  // 再スタート処理をメモ化
-  const handleRestart = useCallback(() => {
-    onSave({ reset: true } as any);
-    onOpenChange(false);
-  }, [onSave, onOpenChange]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -139,11 +133,6 @@ export function SettingModal({
               onCheckedChange={(v) => handleSettingChange('shuffle', v)}
             />
           </div>
-
-          {/* 再スタートボタン */}
-          <Button variant="default" onClick={handleRestart} className="w-full">
-            暗記カードを再スタートする
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

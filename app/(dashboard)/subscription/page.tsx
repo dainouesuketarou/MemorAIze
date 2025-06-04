@@ -24,6 +24,9 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import { STRIPE_PRICE_IDS } from '@/lib/stripe';
+import { useSelector, useDispatch } from 'react-redux';
+import type { RootState } from '@/lib/store/store';
+import { setSubscription } from '@/lib/store/slices/userSlice';
 
 // Stripeの公開キーを初期化
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -144,7 +147,10 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [subscription, setSubscription] = useState<any>(null);
+  const user = useSelector((state: RootState) => state.user);
+  const userSubscription = user.subscription;
+  const dispatch = useDispatch();
+  const [isUserLoading, setIsUserLoading] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -152,23 +158,18 @@ export default function SubscriptionPage() {
     }
   }, [status, router]);
 
+  // ページ遷移直後でもReduxのuser stateがundefinedの場合は取得してセット
   useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        const response = await fetch('/api/subscription');
-        if (response.ok) {
-          const data = await response.json();
-          setSubscription(data);
-        }
-      } catch (error) {
-        console.error('サブスクリプション情報の取得に失敗しました:', error);
-      }
-    };
-
-    if (session?.user) {
-      fetchSubscription();
+    if (!userSubscription && session?.user) {
+      setIsUserLoading(true);
+      fetch('/api/subscription')
+        .then((res) => res.json())
+        .then((data) => {
+          dispatch(setSubscription(data));
+        })
+        .finally(() => setIsUserLoading(false));
     }
-  }, [session]);
+  }, [userSubscription, session, dispatch]);
 
   const handleUpgrade = async (planId: string) => {
     if (!session?.user) {
@@ -184,7 +185,7 @@ export default function SubscriptionPage() {
     }
 
     // 現在のプランと同じ場合は何もしない
-    if (subscription?.plan === plan.stripePriceId) {
+    if (userSubscription?.stripePriceId === plan.stripePriceId) {
       toast.info('現在のプランと同じです');
       return;
     }
@@ -219,9 +220,10 @@ export default function SubscriptionPage() {
     }
   };
 
+  // Reduxのuser.subscriptionから現在のプランを取得
   const getCurrentPlan = () => {
-    if (!subscription) return 'free';
-    switch (subscription.plan) {
+    if (!userSubscription) return 'free';
+    switch (userSubscription.stripePriceId) {
       case STRIPE_PRICE_IDS.PRO_MONTHLY:
         return 'pro-monthly';
       case STRIPE_PRICE_IDS.PRO_YEARLY:
@@ -230,10 +232,9 @@ export default function SubscriptionPage() {
         return 'free';
     }
   };
-
   const currentPlanId = getCurrentPlan();
 
-  if (status === 'loading') {
+  if (status === 'loading' || isUserLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -269,14 +270,14 @@ export default function SubscriptionPage() {
         <p className="text-xl text-muted-foreground">
           あなたの学習をサポートする最適なプランをお選びください
         </p>
-        {subscription && (
+        {userSubscription && (
           <p className="mt-2 text-sm text-muted-foreground">
             現在のプラン: {plans.find((p) => p.id === currentPlanId)?.name}
-            {subscription.stripeCurrentPeriodEnd && (
+            {userSubscription.stripeCurrentPeriodEnd && (
               <span className="ml-2">
                 (次回更新日:{' '}
                 {new Date(
-                  subscription.stripeCurrentPeriodEnd,
+                  userSubscription.stripeCurrentPeriodEnd,
                 ).toLocaleDateString('ja-JP')}
                 )
               </span>
@@ -288,6 +289,44 @@ export default function SubscriptionPage() {
       <div className="grid md:grid-cols-3 gap-8">
         {plans.map((plan) => {
           const isCurrentPlan = plan.id === currentPlanId;
+          // Freeプランはアップグレードボタン自体を非表示
+          if (currentPlanId === 'free' && plan.id === 'free') {
+            return (
+              <Card
+                key={plan.id}
+                className={cn(
+                  'flex flex-col',
+                  plan.isPopular && 'border-primary shadow-lg',
+                  isCurrentPlan && 'border-2 border-primary',
+                )}
+              >
+                <CardHeader>
+                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                  <CardDescription>{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <div className="mb-6">
+                    <span className="text-4xl font-bold">
+                      ¥{plan.price.toLocaleString()}
+                    </span>
+                    <span className="text-muted-foreground">
+                      /{plan.interval === 'month' ? '月' : '年'}
+                    </span>
+                  </div>
+                  <ul className="space-y-3">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-center">
+                        <Check className="h-5 w-5 text-primary mr-2" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                {/* Freeプランはボタンなし */}
+                <CardFooter />
+              </Card>
+            );
+          }
           return (
             <Card
               key={plan.id}
@@ -330,7 +369,9 @@ export default function SubscriptionPage() {
                       : 'outline'
                   }
                   onClick={() => handleUpgrade(plan.id)}
-                  disabled={loading === plan.id || isCurrentPlan}
+                  disabled={
+                    loading === plan.id || isCurrentPlan || !userSubscription
+                  }
                 >
                   {loading === plan.id ? (
                     <>

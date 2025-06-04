@@ -58,17 +58,19 @@ export function MainNav({
             暗記カード帳
           </Button>
         </Link> */}
-        <Button
-          variant={groupMode ? 'default' : 'ghost'}
-          className={cn(
-            'text-sm font-medium transition-colors',
-            groupMode ? 'text-foreground' : 'text-muted-foreground',
-          )}
-          onClick={() => setGroupMode(!groupMode)}
-        >
-          <GroupIcon className="mr-2 h-4 w-4" />
-          {groupMode ? 'グループ化モード解除' : 'グループ化'}
-        </Button>
+        {pathname === '/dashboard' && (
+          <Button
+            variant={groupMode ? 'default' : 'ghost'}
+            className={cn(
+              'text-sm font-medium transition-colors',
+              groupMode ? 'text-foreground' : 'text-muted-foreground',
+            )}
+            onClick={() => setGroupMode(!groupMode)}
+          >
+            <GroupIcon className="mr-2 h-4 w-4" />
+            {groupMode ? 'グループ化モード解除' : 'グループ化'}
+          </Button>
+        )}
         {/* <Link href="/dashboard/review">
           <Button
             variant="ghost"
