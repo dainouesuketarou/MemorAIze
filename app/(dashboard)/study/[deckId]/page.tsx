@@ -216,67 +216,8 @@ export default function StudyPage() {
     }
   };
 
-  /* ====== 結果送信 & 完了 ====== */
-  const handleNext = useCallback(
-    async (finalResult?: boolean) => {
-      if (currentIndex >= totalCards - 1 && isTransitioning) return;
-      if (currentIndex < totalCards - 1) {
-        next();
-      } else {
-        setIsTransitioning(true);
-        next();
-
-        // 最後の1枚の結果を含めた結果を準備
-        let finalResults = studyResults;
-        if (typeof finalResult === 'boolean' && currentCard) {
-          finalResults = [
-            ...studyResults,
-            { id: currentCard.id, mastered: finalResult },
-          ];
-        }
-
-        // 並列でAPIリクエストを実行
-        const [resultResponse, historyResponse] = await Promise.all([
-          fetch(`/api/study/${deckId}/result`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ results: finalResults }),
-          }),
-          fetch(`/api/study/${deckId}/history`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              progress: Math.round(((masteredCount + 1) / totalCards) * 100),
-            }),
-          }),
-        ]);
-
-        // エラーチェック
-        if (!resultResponse.ok || !historyResponse.ok) {
-          console.error('学習履歴の保存に失敗しました');
-        }
-
-        // 進捗をクリアしてリダイレクト
-        dispatch(clearProgress(deckId as string));
-        router.push(`/deck/${deckId}`);
-      }
-    },
-    [
-      currentIndex,
-      currentCard,
-      deckId,
-      dispatch,
-      isTransitioning,
-      masteredCount,
-      next,
-      router,
-      studyResults,
-      totalCards,
-    ],
-  );
-
-  /* ====== 正解/不正解/学習完了 ====== */
-  const handleCorrect = useCallback(() => {
+  /* ====== 正解/不正解/学習完了（元実装を保持） ====== */
+  const handleCorrect = () => {
     // 最後のカードで既に遷移中なら重複防止
     if (currentIndex >= totalCards - 1 && isTransitioning) return;
 
@@ -291,16 +232,9 @@ export default function StudyPage() {
     } else {
       handleNext(true);
     }
-  }, [
-    currentIndex,
-    currentCard,
-    isTransitioning,
-    totalCards,
-    next,
-    handleNext,
-  ]);
+  };
 
-  const handleIncorrect = useCallback(() => {
+  const handleIncorrect = () => {
     if (currentIndex >= totalCards - 1 && isTransitioning) return;
 
     setStudyResults((prev) => [
@@ -314,14 +248,51 @@ export default function StudyPage() {
     } else {
       handleNext(false);
     }
-  }, [
-    currentIndex,
-    currentCard,
-    isTransitioning,
-    totalCards,
-    next,
-    handleNext,
-  ]);
+  };
+
+  /* ====== 結果送信 & 完了 ====== */
+  const handleNext = async (finalResult?: boolean) => {
+    if (currentIndex >= totalCards - 1 && isTransitioning) return;
+    if (currentIndex < totalCards - 1) {
+      next();
+    } else {
+      setIsTransitioning(true);
+      next();
+
+      // 最後の1枚の結果を含めた結果を準備
+      let finalResults = studyResults;
+      if (typeof finalResult === 'boolean' && currentCard) {
+        finalResults = [
+          ...studyResults,
+          { id: currentCard.id, mastered: finalResult },
+        ];
+      }
+
+      // 並列でAPIリクエストを実行
+      const [resultResponse, historyResponse] = await Promise.all([
+        fetch(`/api/study/${deckId}/result`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ results: finalResults }),
+        }),
+        fetch(`/api/study/${deckId}/history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            progress: Math.round(((masteredCount + 1) / totalCards) * 100),
+          }),
+        }),
+      ]);
+
+      // エラーチェック
+      if (!resultResponse.ok || !historyResponse.ok) {
+        console.error('学習履歴の保存に失敗しました');
+      }
+
+      // 即座にリダイレクト
+      router.push(`/deck/${deckId}`);
+    }
+  };
 
   /* ============ ドラッグ ============ */
   const handleDrag = useCallback(
