@@ -267,7 +267,7 @@ export default function BillingPage() {
               </Button>
               {canCancel && (
                 <Button variant="destructive" onClick={handleCancel}>
-                  キャンセル
+                  Freeに戻る
                 </Button>
               )}
             </CardFooter>
