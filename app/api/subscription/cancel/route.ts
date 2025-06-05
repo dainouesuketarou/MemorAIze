@@ -23,30 +23,50 @@ export async function POST() {
       );
     }
 
-    // Stripeのサブスクリプションをキャンセル
-    const stripeSubscription = await stripe.subscriptions.update(
-      subscription.stripeSubscriptionId,
-      {
-        cancel_at_period_end: true,
-      },
-    );
+    try {
+      // Stripeのサブスクリプションを取得して状態を確認
+      const stripeSubscription = await stripe.subscriptions.retrieve(
+        subscription.stripeSubscriptionId,
+      );
 
-    // データベースのサブスクリプション情報を更新
-    const updatedSubscription = await prisma.subscription.update({
-      where: { userId: session.user.id },
-      data: {
-        status: 'CANCELED',
-        cancelAtPeriodEnd: true,
-        stripeCurrentPeriodEnd: new Date(
-          (stripeSubscription as any).current_period_end * 1000,
-        ),
-      },
-    });
+      if (stripeSubscription.status === 'canceled') {
+        return NextResponse.json(
+          { error: 'サブスクリプションはすでにキャンセルされています' },
+          { status: 400 },
+        );
+      }
 
-    return NextResponse.json({
-      message: 'サブスクリプションをキャンセルしました',
-      currentPeriodEnd: updatedSubscription.stripeCurrentPeriodEnd,
-    });
+      // サブスクリプションをキャンセル
+      const updatedStripeSubscription = await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        {
+          cancel_at_period_end: true,
+        },
+      );
+
+      // データベースのサブスクリプション情報を更新
+      const updatedSubscription = await prisma.subscription.update({
+        where: { userId: session.user.id },
+        data: {
+          status: 'CANCELED',
+          cancelAtPeriodEnd: true,
+          stripeCurrentPeriodEnd: new Date(
+            (updatedStripeSubscription as any).current_period_end * 1000,
+          ),
+        },
+      });
+
+      return NextResponse.json({
+        message: 'サブスクリプションをキャンセルしました',
+        currentPeriodEnd: updatedSubscription.stripeCurrentPeriodEnd,
+      });
+    } catch (stripeError) {
+      console.error('Stripe API error:', stripeError);
+      return NextResponse.json(
+        { error: 'Stripeでの処理に失敗しました' },
+        { status: 500 },
+      );
+    }
   } catch (error) {
     console.error('Subscription cancellation error:', error);
     return NextResponse.json(
