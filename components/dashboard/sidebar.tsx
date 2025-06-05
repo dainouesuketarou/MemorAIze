@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
 
 interface SidebarProps {
   groups: Group[];
@@ -28,16 +30,22 @@ export function Sidebar({
   setShowGroupInput,
 }: SidebarProps) {
   const [isLoading, setIsLoading] = useState(true);
+  const userId = useSelector((state: RootState) => state.user.id);
 
   /* ───────────────── フェッチ ───────────────── */
   useEffect(() => {
+    if (!userId) return;
+
     setIsLoading(true);
-    fetch('/api/groups')
+    fetch(`/api/groups?userId=${userId}`)
       .then((r) => r.json())
       .then((data: Group[]) => setGroups(data))
-      .catch((e) => console.error('グループ取得エラー:', e))
+      .catch((e) => {
+        console.error('グループ取得エラー:', e);
+        toast.error('グループの取得に失敗しました');
+      })
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [userId, setGroups]);
 
   /* ---------------「すべて」タブを挿入 --------------- */
   const allTab: Group = {
