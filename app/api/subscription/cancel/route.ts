@@ -30,18 +30,34 @@ export async function POST() {
         subscription.stripeSubscriptionId,
       )) as Stripe.Subscription;
 
+      // すでにキャンセルされている場合
       if (stripeSubscription.status === 'canceled') {
-        return NextResponse.json(
-          { error: 'サブスクリプションはすでにキャンセルされています' },
-          { status: 400 },
-        );
+        // データベースの状態を更新
+        await prisma.subscription.update({
+          where: { userId: session.user.id },
+          data: {
+            status: 'CANCELED',
+            cancelAtPeriodEnd: true,
+            stripeCurrentPeriodEnd: new Date(
+              (stripeSubscription as any).current_period_end * 1000,
+            ),
+          },
+        });
+
+        return NextResponse.json({
+          message: 'サブスクリプションはすでにキャンセルされています',
+          currentPeriodEnd: new Date(
+            (stripeSubscription as any).current_period_end * 1000,
+          ),
+        });
       }
 
-      // サブスクリプションをキャンセル
+      // アクティブなサブスクリプションの場合、Stripeでキャンセル処理を実行
       const updatedStripeSubscription = (await stripe.subscriptions.update(
         subscription.stripeSubscriptionId,
         {
-          cancel_at_period_end: true,
+          cancel_at_period_end: true, // 現在の期間終了時にキャンセル
+          proration_behavior: 'none', // 比例配分なし
         },
       )) as Stripe.Subscription;
 
@@ -64,6 +80,13 @@ export async function POST() {
     } catch (stripeError) {
       console.error('Stripe API error:', stripeError);
       if (stripeError instanceof Stripe.errors.StripeError) {
+        // キャンセル済みのサブスクリプションの場合
+        if (stripeError.message.includes('canceled subscription')) {
+          return NextResponse.json({
+            message: 'サブスクリプションはすでにキャンセルされています',
+            currentPeriodEnd: subscription.stripeCurrentPeriodEnd,
+          });
+        }
         return NextResponse.json(
           { error: `Stripeエラー: ${stripeError.message}` },
           { status: 500 },
