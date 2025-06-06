@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import Stripe from 'stripe';
 
 export async function POST() {
   try {
@@ -25,9 +26,9 @@ export async function POST() {
 
     try {
       // Stripeのサブスクリプションを取得して状態を確認
-      const stripeSubscription = await stripe.subscriptions.retrieve(
+      const stripeSubscription = (await stripe.subscriptions.retrieve(
         subscription.stripeSubscriptionId,
-      );
+      )) as Stripe.Subscription;
 
       if (stripeSubscription.status === 'canceled') {
         return NextResponse.json(
@@ -37,12 +38,12 @@ export async function POST() {
       }
 
       // サブスクリプションをキャンセル
-      const updatedStripeSubscription = await stripe.subscriptions.update(
+      const updatedStripeSubscription = (await stripe.subscriptions.update(
         subscription.stripeSubscriptionId,
         {
           cancel_at_period_end: true,
         },
-      );
+      )) as Stripe.Subscription;
 
       // データベースのサブスクリプション情報を更新
       const updatedSubscription = await prisma.subscription.update({
@@ -62,6 +63,12 @@ export async function POST() {
       });
     } catch (stripeError) {
       console.error('Stripe API error:', stripeError);
+      if (stripeError instanceof Stripe.errors.StripeError) {
+        return NextResponse.json(
+          { error: `Stripeエラー: ${stripeError.message}` },
+          { status: 500 },
+        );
+      }
       return NextResponse.json(
         { error: 'Stripeでの処理に失敗しました' },
         { status: 500 },
