@@ -10,6 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useDispatch } from 'react-redux';
+import { setFilter, setSort } from '@/lib/store/slices/deckSlice';
+import { AnyAction } from '@reduxjs/toolkit';
+import { useCallback, useMemo } from 'react';
 
 interface DeckFilterProps {
   filter: 'all' | 'inProgress' | 'completed' | 'notStarted';
@@ -26,14 +30,43 @@ export function DeckFilter({
   sort,
   setSort,
 }: DeckFilterProps) {
+  const dispatch = useDispatch();
+
+  const handleFilterChange = useCallback(
+    (value: string) => {
+      const newFilter = value as
+        | 'all'
+        | 'inProgress'
+        | 'completed'
+        | 'notStarted';
+      dispatch(setFilter(newFilter) as unknown as AnyAction);
+      setFilter(newFilter);
+    },
+    [dispatch, setFilter],
+  );
+
+  const handleSortChange = useCallback(
+    (newSort: 'recent' | 'alphabetical' | 'cardCount') => {
+      dispatch(setSort(newSort) as unknown as AnyAction);
+      setSort(newSort);
+    },
+    [dispatch, setSort],
+  );
+
+  const sortOptions = useMemo(
+    () => [
+      { value: 'recent', label: '最近の学習順' },
+      { value: 'alphabetical', label: '名前順' },
+      { value: 'cardCount', label: 'カード数順' },
+    ],
+    [],
+  );
+
   return (
     <div className="bg-card rounded-lg border p-4">
       <div className="flex items-center justify-between gap-6">
         <div className="overflow-x-auto">
-          <Tabs
-            defaultValue={filter}
-            onValueChange={(v: string) => setFilter(v as any)}
-          >
+          <Tabs value={filter} onValueChange={handleFilterChange}>
             <TabsList>
               <TabsTrigger value="all" className="whitespace-nowrap">
                 全て
@@ -60,15 +93,14 @@ export function DeckFilter({
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>並び替え</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSort('recent')}>
-                最近の学習順
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSort('alphabetical')}>
-                名前順
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSort('cardCount')}>
-                カード数順
-              </DropdownMenuItem>
+              {sortOptions.map((option) => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={() => handleSortChange(option.value as any)}
+                >
+                  {option.label}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

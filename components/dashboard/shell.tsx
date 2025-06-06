@@ -23,6 +23,17 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { AiLimitBadge } from '@/components/dashboard/ai-limit-badge';
 import { Loading } from '../loading';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import {
+  setDecks,
+  setLoading as setDecksLoading,
+} from '@/lib/store/slices/deckSlice';
+import {
+  setGroups,
+  setLoading as setGroupsLoading,
+} from '@/lib/store/slices/groupSlice';
+import { AnyAction } from '@reduxjs/toolkit';
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -65,6 +76,7 @@ export function DashboardShell({
   groupMode,
   setGroupMode,
 }: DashboardShellProps) {
+  const dispatch = useDispatch();
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -73,6 +85,59 @@ export function DashboardShell({
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardPage = pathname === '/dashboard';
+
+  // Reduxの読み込み状態を取得
+  const { isLoading: decksLoading } = useSelector(
+    (state: RootState) => state.deck,
+  );
+  const { isLoading: groupsLoading } = useSelector(
+    (state: RootState) => state.group,
+  );
+
+  // 初期データの読み込み
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        dispatch(setDecksLoading(true));
+        dispatch(setGroupsLoading(true));
+
+        // デッキの取得
+        const decksRes = await fetch('/api/decks');
+        if (!decksRes.ok) throw new Error('デッキ一覧の取得に失敗しました');
+        const decksData = await decksRes.json();
+
+        if (isMounted) {
+          dispatch(setDecks(decksData) as unknown as AnyAction);
+          // setDecksは親コンポーネントの状態を更新するため、ここでは呼び出さない
+        }
+
+        // グループの取得
+        const groupsRes = await fetch('/api/groups');
+        if (!groupsRes.ok) throw new Error('グループ一覧の取得に失敗しました');
+        const groupsData = await groupsRes.json();
+
+        if (isMounted) {
+          dispatch(setGroups(groupsData) as unknown as AnyAction);
+        }
+      } catch (error) {
+        console.error('データ取得エラー:', error);
+      } finally {
+        if (isMounted) {
+          dispatch(setDecksLoading(false));
+          dispatch(setGroupsLoading(false));
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch]);
 
   // スクロールイベントの最適化
   useEffect(() => {
@@ -106,8 +171,6 @@ export function DashboardShell({
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error fetching AI generation limit:', error);
         }
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -219,7 +282,11 @@ export function DashboardShell({
           <MainNav
             groups={groups}
             decks={decks}
-            setDecks={setDecks}
+            setDecks={(newDecks) => {
+              // 親コンポーネントの状態更新とReduxの状態更新を分離
+              setDecks(newDecks);
+              dispatch(setDecks(newDecks) as unknown as AnyAction);
+            }}
             groupMode={groupMode}
             setGroupMode={setGroupMode}
           />
@@ -254,8 +321,10 @@ export function DashboardShell({
       <main className={cn('flex-1 py-8', fullWidth ? 'container-fluid' : '')}>
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
           <AiLimitBadge />
-          {loading ? (
-            <Loading />
+          {loading || decksLoading || groupsLoading ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Loading />
+            </div>
           ) : Array.isArray(children) ? (
             children.map((child, i) => <div key={i}>{child}</div>)
           ) : (

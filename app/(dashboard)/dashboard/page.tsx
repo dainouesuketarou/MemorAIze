@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Group } from '@prisma/client';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { DashboardShell } from '@/components/dashboard/shell';
@@ -14,107 +14,113 @@ import { useSession } from 'next-auth/react';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { DeckFilter } from '@/components/dashboard/deck-filter';
 import { toast } from 'sonner';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import {
+  setDecks,
+  setLoading,
+  setError,
+  setFilter,
+  setSort,
+} from '@/lib/store/slices/deckSlice';
+import { setGroups } from '@/lib/store/slices/groupSlice';
+import { AnyAction } from '@reduxjs/toolkit';
+import { Deck } from '@/lib/store/slices/deckSlice';
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
+  const dispatch = useDispatch();
+  const {
+    decks: reduxDecks,
+    isLoading: decksLoading,
+    filter: reduxFilter,
+    sort: reduxSort,
+  } = useSelector((state: RootState) => state.deck);
+  const { groups: reduxGroups } = useSelector(
+    (state: RootState) => state.group,
+  );
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [newGroupName, setNewGroupName] = useState<string>('');
   const [showGroupInput, setShowGroupInput] = useState<boolean>(false);
   const [groupMode, setGroupMode] = useState<boolean>(false);
-  const [filter, setFilter] = useState<
-    'all' | 'inProgress' | 'completed' | 'notStarted'
-  >('all');
-  const [sort, setSort] = useState<'recent' | 'alphabetical' | 'cardCount'>(
-    'recent',
-  );
 
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const fetchDecks = async () => {
+    const fetchData = async () => {
+      dispatch(setLoading(true));
       try {
-        const res = await fetch('/api/decks');
-        if (!res.ok) {
-          throw new Error('デッキ一覧の取得に失敗しました');
-        }
-        const data: Partial<DeckWithCardsAndGroups>[] = await res.json();
-        const mapped = data.map((d) => ({
-          ...d,
-          cards: d.cards ?? [],
-          groups: d.groups ?? [],
-        })) as DeckWithCardsAndGroups[];
-        setDecks(mapped);
+        // デッキの取得
+        const decksRes = await fetch('/api/decks');
+        if (!decksRes.ok) throw new Error('デッキ一覧の取得に失敗しました');
+        const decksData = await decksRes.json();
+        dispatch(setDecks(decksData));
+
+        // グループの取得
+        const groupsRes = await fetch(`/api/groups?userId=${session.user.id}`);
+        if (!groupsRes.ok) throw new Error('グループ一覧の取得に失敗しました');
+        const groupsData = await groupsRes.json();
+        dispatch(setGroups(groupsData));
       } catch (error) {
-        console.error('デッキ取得エラー:', error);
-        toast.error('デッキ一覧の取得に失敗しました');
+        console.error('データ取得エラー:', error);
+        dispatch(
+          setError(
+            error instanceof Error
+              ? error.message
+              : 'データの取得に失敗しました',
+          ),
+        );
+        toast.error('データの取得に失敗しました');
+      } finally {
+        dispatch(setLoading(false));
       }
     };
 
-    fetchDecks();
-  }, [session]);
-
-  useEffect(() => {
-    const refresh = async () => {
-      try {
-        const res = await fetch('/api/decks');
-        if (!res.ok) {
-          throw new Error('デッキ一覧の取得に失敗しました');
-        }
-        const data: Partial<DeckWithCardsAndGroups>[] = await res.json();
-        const mapped = data.map((d) => ({
-          ...d,
-          cards: d.cards ?? [],
-          groups: d.groups ?? [],
-        })) as DeckWithCardsAndGroups[];
-        setDecks(mapped);
-      } catch (error) {
-        console.error('デッキ取得エラー:', error);
-        toast.error('デッキ一覧の取得に失敗しました');
-      }
-    };
-
-    window.addEventListener('refreshDecks', refresh);
-    return () => window.removeEventListener('refreshDecks', refresh);
-  }, []);
-
-  // グループ選択フィルタリング
-  const filteredDecks =
-    selectedGroup === 'all'
-      ? decks
-      : decks.filter((d) => d.groups.some((g) => g.id === selectedGroup));
+    fetchData();
+  }, [session?.user?.id, dispatch]);
 
   // フィルタリングとソートの適用
-  const filteredAndSortedDecks = [...filteredDecks]
-    .filter((deck) => {
-      if (filter === 'all') return true;
-      if (filter === 'inProgress')
-        return deck.progress > 0 && deck.progress < 1;
-      if (filter === 'completed') return deck.progress === 1;
-      if (filter === 'notStarted') return deck.progress === 0;
-      return true;
-    })
-    .sort((a, b) => {
-      if (sort === 'recent') {
-        const bTime = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
-        const aTime = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
-        return bTime - aTime;
-      }
-      if (sort === 'alphabetical') {
-        return a.title.localeCompare(b.title);
-      }
-      if (sort === 'cardCount') {
-        return b.cardCount - a.cardCount;
-      }
-      return 0;
-    });
+  const filteredAndSortedDecks = useMemo(() => {
+    const filtered =
+      selectedGroup === 'all'
+        ? reduxDecks
+        : reduxDecks.filter((d) =>
+            d.groups?.some((g) => g.id === selectedGroup),
+          );
+
+    return [...filtered]
+      .filter((deck) => {
+        if (reduxFilter === 'all') return true;
+        if (reduxFilter === 'inProgress')
+          return deck.progress && deck.progress > 0 && deck.progress < 1;
+        if (reduxFilter === 'completed') return deck.progress === 1;
+        if (reduxFilter === 'notStarted')
+          return !deck.progress || deck.progress === 0;
+        return true;
+      })
+      .sort((a, b) => {
+        if (reduxSort === 'recent') {
+          const bTime = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
+          const aTime = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
+          return bTime - aTime;
+        }
+        if (reduxSort === 'alphabetical') {
+          return a.title.localeCompare(b.title);
+        }
+        if (reduxSort === 'cardCount') {
+          return b.cardCount - a.cardCount;
+        }
+        return 0;
+      });
+  }, [reduxDecks, selectedGroup, reduxFilter, reduxSort]);
 
   return (
     <DashboardShell
-      groups={groups}
-      decks={decks}
-      setDecks={setDecks}
+      groups={reduxGroups}
+      decks={reduxDecks as DeckWithCardsAndGroups[]}
+      setDecks={(decks) =>
+        dispatch(setDecks(decks as Deck[]) as unknown as AnyAction)
+      }
       groupMode={groupMode}
       setGroupMode={setGroupMode}
     >
@@ -132,25 +138,31 @@ export default function DashboardPage() {
         </DashboardHeader>
 
         <DeckFilter
-          filter={filter}
-          setFilter={setFilter}
-          sort={sort}
-          setSort={setSort}
+          filter={reduxFilter}
+          setFilter={(filter) =>
+            dispatch(setFilter(filter) as unknown as AnyAction)
+          }
+          sort={reduxSort}
+          setSort={(sort) => dispatch(setSort(sort) as unknown as AnyAction)}
         />
 
         <div className="py-4 pl-4 pr-8 flex lg:flex-row gap-5">
           <div className="w-4/5 lg:w-10/12">
             <DeckList
-              decks={filteredAndSortedDecks}
+              decks={filteredAndSortedDecks as DeckWithCardsAndGroups[]}
               groupMode={groupMode}
-              groups={groups}
-              setDecks={setDecks}
+              groups={reduxGroups}
+              setDecks={(decks) =>
+                dispatch(setDecks(decks as Deck[]) as unknown as AnyAction)
+              }
             />
           </div>
           <div className="w-1/5 lg:w-2/12">
             <Sidebar
-              groups={groups}
-              setGroups={setGroups}
+              groups={reduxGroups as Group[]}
+              setGroups={(groups) =>
+                dispatch(setGroups(groups as Group[]) as unknown as AnyAction)
+              }
               selectedGroup={selectedGroup}
               setSelectedGroup={setSelectedGroup}
               newGroupName={newGroupName}

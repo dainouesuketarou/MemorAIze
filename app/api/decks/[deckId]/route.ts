@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { getServerSession } from "next-auth";
+import { getServerSession } from 'next-auth';
 
 const prisma = new PrismaClient();
 
-export async function PATCH(req: NextRequest, { params }: { params: { deckId: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { deckId: string } },
+) {
   const deckId = params.deckId;
   const data = await req.json();
   const { groupIds, title, description } = data; // 新しいグループID配列
@@ -16,8 +19,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { deckId: st
         where: { id: deckId },
         data: { title },
       });
-    } catch (e) { 
-      return NextResponse.json({ error: 'タイトル更新エラー', detail: String(e) }, { status: 500 });
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'タイトル更新エラー', detail: String(e) },
+        { status: 500 },
+      );
     }
   }
   if (description) {
@@ -27,7 +33,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { deckId: st
         data: { description },
       });
     } catch (e) {
-      return NextResponse.json({ error: '説明更新エラー', detail: String(e) }, { status: 500 });
+      return NextResponse.json(
+        { error: '説明更新エラー', detail: String(e) },
+        { status: 500 },
+      );
     }
   }
   if (groupIds) {
@@ -36,20 +45,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { deckId: st
         where: { id: deckId },
         data: {
           groups: {
-            set: groupIds.map((id: string) => ({ id }))
-          }
+            set: groupIds.map((id: string) => ({ id })),
+          },
         },
-        include: { groups: true }
+        include: { groups: true },
       });
       return NextResponse.json({ success: true, updated });
     } catch (e) {
-      return NextResponse.json({ error: 'グループ更新エラー', detail: String(e) }, { status: 500 });
+      return NextResponse.json(
+        { error: 'グループ更新エラー', detail: String(e) },
+        { status: 500 },
+      );
     }
   }
   return NextResponse.json({ success: true });
 }
 
-export async function GET(req: NextRequest, { params }: { params: { deckId: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { deckId: string } },
+) {
   try {
     const deck = await prisma.deck.findUnique({
       where: { id: params.deckId },
@@ -59,13 +74,22 @@ export async function GET(req: NextRequest, { params }: { params: { deckId: stri
       return NextResponse.json({ error: 'Deck not found' }, { status: 404 });
     }
     const totalCards = deck.cards.length;
-    const masteredCount = deck.cards.filter(card => card.status === 'MASTERED').length;
-    const strugglingCount = deck.cards.filter(card => card.status === 'STRUGGLING').length;
-    const unlearnedCount = deck.cards.filter(card => card.status === 'UNLEARNED').length;
+    const masteredCount = deck.cards.filter(
+      (card) => card.status === 'MASTERED',
+    ).length;
+    const strugglingCount = deck.cards.filter(
+      (card) => card.status === 'STRUGGLING',
+    ).length;
+    const unlearnedCount = deck.cards.filter(
+      (card) => card.status === 'UNLEARNED',
+    ).length;
     const stats = {
-      mastered: totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0,
-      struggling: totalCards > 0 ? Math.round((strugglingCount / totalCards) * 100) : 0,
-      unlearned: totalCards > 0 ? Math.round((unlearnedCount / totalCards) * 100) : 0,
+      mastered:
+        totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0,
+      struggling:
+        totalCards > 0 ? Math.round((strugglingCount / totalCards) * 100) : 0,
+      unlearned:
+        totalCards > 0 ? Math.round((unlearnedCount / totalCards) * 100) : 0,
     };
     const progressHistory = await prisma.studyHistory.findMany({
       where: { deckId: params.deckId },
@@ -75,18 +99,21 @@ export async function GET(req: NextRequest, { params }: { params: { deckId: stri
     });
     return NextResponse.json({ ...deck, stats, progressHistory });
   } catch (e) {
-    return NextResponse.json({ error: 'DB取得エラー', detail: String(e) }, { status: 500 });
+    return NextResponse.json(
+      { error: 'DB取得エラー', detail: String(e) },
+      { status: 500 },
+    );
   }
 }
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { deckId: string } }
+  { params }: { params: { deckId: string } },
 ) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const deckId = params.deckId;
@@ -100,7 +127,7 @@ export async function DELETE(
     });
 
     if (!deck) {
-      return new NextResponse("Deck not found", { status: 404 });
+      return new NextResponse('Deck not found', { status: 404 });
     }
 
     // トランザクションで関連データを削除
@@ -129,7 +156,7 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("[DECK_DELETE]", error);
-    return new NextResponse("Internal error", { status: 500 });
+    console.error('[DECK_DELETE]', error);
+    return new NextResponse('Internal error', { status: 500 });
   }
 }

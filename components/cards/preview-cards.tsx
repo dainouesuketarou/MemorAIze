@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/dialog';
 import { MathRenderer } from '@/components/common/MathRenderer';
 import { MathText } from '@/components/common/MathText';
+import { Group } from '@prisma/client';
+import { FormLabel } from '@/components/ui/form';
 
 interface PreviewCard {
   id: string;
@@ -40,6 +42,9 @@ interface PreviewCardsProps {
   onCardsChange: (cards: PreviewCard[]) => void;
   onRegenerate?: (additionalInstructions: string) => Promise<PreviewCard[]>;
   onClose?: () => void;
+  groups: Group[];
+  selectedGroupIds: string[];
+  onGroupIdsChange: (groupIds: string[]) => void;
 }
 
 export function PreviewCards({
@@ -50,6 +55,9 @@ export function PreviewCards({
   onRegenerate,
   onCardsChange,
   onClose,
+  groups,
+  selectedGroupIds,
+  onGroupIdsChange,
 }: PreviewCardsProps) {
   const [cards, setCards] = useState<PreviewCard[]>(initialCards || []);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -301,6 +309,34 @@ export function PreviewCards({
               </div>
             </Card>
           ))}
+        </div>
+
+        {/* グループ選択 */}
+        <div className="space-y-2">
+          <FormLabel>分野（複数選択可）</FormLabel>
+          <div className="flex flex-wrap gap-2">
+            {groups.map((group) => (
+              <label
+                key={group.id}
+                className="flex items-center gap-1 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedGroupIds.includes(group.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      onGroupIdsChange([...selectedGroupIds, group.id]);
+                    } else {
+                      onGroupIdsChange(
+                        selectedGroupIds.filter((id) => id !== group.id),
+                      );
+                    }
+                  }}
+                />
+                <span>{group.name}</span>
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 

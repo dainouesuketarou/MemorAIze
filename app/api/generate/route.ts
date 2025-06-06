@@ -234,10 +234,37 @@ ${JSON.stringify(cards, null, 2)}
 
       // カウント更新（Freeプランの場合のみ）
       if (!isProUser && genLimit) {
-        await prisma.aiGenerationLimit.update({
+        const updatedLimit = await prisma.aiGenerationLimit.update({
           where: { id: genLimit.id },
           data: { count: { increment: 1 } },
         });
+
+        // Reduxの状態を更新するためのレスポンスヘッダーを追加
+        const headers = new Headers();
+        headers.append(
+          'X-Update-AI-Limit',
+          JSON.stringify({
+            dailyUsage: updatedLimit.count,
+            dailyLimit: FREE_PLAN_MONTHLY_LIMIT,
+            monthlyUsage: updatedLimit.count,
+            monthlyLimit: FREE_PLAN_MONTHLY_LIMIT,
+          }),
+        );
+
+        return NextResponse.json(
+          {
+            success: true,
+            data: {
+              title,
+              cards: cards.map((c, i) => ({
+                id: `card-${i + 1}`,
+                front: c.front,
+                back: c.back,
+              })),
+            },
+          },
+          { headers },
+        );
       }
 
       return NextResponse.json({

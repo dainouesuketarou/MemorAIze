@@ -19,6 +19,8 @@ import {
   saveProgress,
   clearProgress,
 } from '@/lib/store/slices/studyProgressSlice';
+import { updateDeckProgress } from '@/lib/store/slices/deckSlice';
+import { AnyAction } from '@reduxjs/toolkit';
 import { MathRenderer } from '@/components/common/MathRenderer';
 import { MathText } from '@/components/common/MathText';
 
@@ -305,7 +307,13 @@ export default function StudyPage() {
           throw new Error('学習履歴の保存に失敗しました');
         }
 
-        // 進捗をクリア
+        // Reduxの状態を更新
+        dispatch(
+          updateDeckProgress({
+            deckId: deckId as string,
+            progress: progressPercentage,
+          }) as unknown as AnyAction,
+        );
         dispatch(clearProgress(deckId as string));
 
         // 少し待ってからリダイレクト（ローディング表示のため）

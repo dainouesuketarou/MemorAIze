@@ -36,10 +36,16 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import { setDecks, setLoading, setError } from '@/lib/store/slices/deckSlice';
+import { AnyAction } from '@reduxjs/toolkit';
 
 export interface DeckWithCardsAndGroups extends Deck {
   cards: { id: string; status: string }[];
   groups: Group[];
+  progress: number;
+  lastStudied: Date | null;
 }
 
 interface DeckListProps {
@@ -55,17 +61,8 @@ export function DeckList({
   groups,
   setDecks,
 }: DeckListProps) {
-  // タブ（進捗フィルタ）
-  const [filter, setFilter] = useState<
-    'all' | 'inProgress' | 'completed' | 'notStarted'
-  >('all');
-  // ソート
-  const [sort, setSort] = useState<'recent' | 'alphabetical' | 'cardCount'>(
-    'recent',
-  );
-  // 親から渡される decks を内部ステートで保持
-  const [localDecks, setLocalDecks] = useState<DeckWithCardsAndGroups[]>(decks);
-  // 分野モーダル用
+  const dispatch = useDispatch();
+  const { isLoading } = useSelector((state: RootState) => state.deck);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDeck, setSelectedDeck] =
     useState<DeckWithCardsAndGroups | null>(null);
@@ -74,12 +71,6 @@ export function DeckList({
     useState<DeckWithCardsAndGroups | null>(null);
   const router = useRouter();
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // 親の decks が変わったら更新
-  useEffect(() => {
-    setLocalDecks(decks);
-  }, [decks]);
 
   // モーダルを開く時に選択状態を初期化
   useEffect(() => {
@@ -100,7 +91,7 @@ export function DeckList({
   // グループ化を確定
   const handleGroupConfirm = async () => {
     if (!selectedDeck) return;
-    setIsLoading(true);
+    dispatch(setLoading(true));
 
     try {
       const res = await fetch(`/api/decks/${selectedDeck.id}`, {
@@ -121,44 +112,55 @@ export function DeckList({
       }
 
       const updatedDecks = await decksRes.json();
+      dispatch(setDecks(updatedDecks) as unknown as AnyAction);
       setDecks(updatedDecks);
-      setLocalDecks(updatedDecks);
       toast.success('グループを更新しました');
       setModalOpen(false);
     } catch (error) {
       console.error('グループ更新エラー:', error);
+      dispatch(
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'グループの更新に失敗しました',
+        ) as unknown as AnyAction,
+      );
       toast.error(
         error instanceof Error ? error.message : 'グループの更新に失敗しました',
       );
     } finally {
-      setIsLoading(false);
+      dispatch(setLoading(false) as unknown as AnyAction);
     }
   };
 
-  // 進捗タブで絞り込み
-  const filteredByProgress = localDecks.filter((deck) => {
-    if (filter === 'all') return true;
-    if (filter === 'inProgress') return deck.progress > 0 && deck.progress < 1;
-    if (filter === 'completed') return deck.progress === 1;
-    if (filter === 'notStarted') return deck.progress === 0;
-    return true;
-  });
+  const handleDelete = async () => {
+    if (!deckToDelete) return;
+    dispatch(setLoading(true) as unknown as AnyAction);
 
-  // ソート
-  const sortedDecks = [...filteredByProgress].sort((a, b) => {
-    if (sort === 'recent') {
-      const bTime = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
-      const aTime = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
-      return bTime - aTime;
+    try {
+      const response = await fetch(`/api/decks/${deckToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete deck');
+      }
+
+      // 削除成功後、デッキリストを更新
+      const updatedDecks = decks.filter((deck) => deck.id !== deckToDelete.id);
+      dispatch(setDecks(updatedDecks) as unknown as AnyAction);
+      setDecks(updatedDecks);
+
+      toast.success('暗記帳を削除しました');
+      setDeleteModalOpen(false);
+      setDeckToDelete(null);
+    } catch (error) {
+      dispatch(setError('暗記帳の削除に失敗しました') as unknown as AnyAction);
+      toast.error('暗記帳の削除に失敗しました');
+    } finally {
+      dispatch(setLoading(false) as unknown as AnyAction);
     }
-    if (sort === 'alphabetical') {
-      return a.title.localeCompare(b.title);
-    }
-    if (sort === 'cardCount') {
-      return b.cardCount - a.cardCount;
-    }
-    return 0;
-  });
+  };
 
   // 日付を相対表現
   const formatRelativeTime = (date: string | Date) => {
@@ -175,42 +177,15 @@ export function DeckList({
   // モーダル内デッキ更新時に選択中デッキも同期
   useEffect(() => {
     if (selectedDeck) {
-      const updated = localDecks.find((d) => d.id === selectedDeck.id);
+      const updated = decks.find((d) => d.id === selectedDeck.id);
       if (updated) setSelectedDeck(updated);
     }
-  }, [localDecks, selectedDeck]);
-
-  const handleDelete = async () => {
-    if (!deckToDelete) return;
-
-    try {
-      const response = await fetch(`/api/decks/${deckToDelete.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete deck');
-      }
-
-      // 削除成功後、デッキリストを更新
-      const updatedDecks = localDecks.filter(
-        (deck) => deck.id !== deckToDelete.id,
-      );
-      setLocalDecks(updatedDecks);
-      setDecks(updatedDecks);
-
-      toast.success('暗記帳を削除しました');
-      setDeleteModalOpen(false);
-      setDeckToDelete(null);
-    } catch (error) {
-      toast.error('暗記帳の削除に失敗しました');
-    }
-  };
+  }, [decks, selectedDeck]);
 
   return (
     <>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {sortedDecks.map((deck) => (
+        {decks.map((deck) => (
           <Card
             key={deck.id}
             className={cn(

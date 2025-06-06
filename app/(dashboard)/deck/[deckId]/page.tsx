@@ -32,6 +32,9 @@ import {
 import { DeckEditForm } from '@/components/decks/deck-edit-form';
 import { Edit2 } from 'lucide-react';
 import { MathRenderer } from '@/components/common/MathRenderer';
+import { useDispatch } from 'react-redux';
+import { setDecks, setSelectedDeck } from '@/lib/store/slices/deckSlice';
+import { AnyAction } from '@reduxjs/toolkit';
 
 // 相対時間を計算する関数
 const getRelativeTime = (dateString: string) => {
@@ -58,6 +61,7 @@ interface StudyHistory {
 export default function DeckDetailsPage() {
   const router = useRouter();
   const { deckId } = useParams();
+  const dispatch = useDispatch();
 
   // 追加: DashboardShell用のstate
   const [groups, setGroups] = useState<Group[]>([]);
@@ -86,8 +90,9 @@ export default function DeckDetailsPage() {
             cards: deck.cards || [],
           })),
         );
+        dispatch(setDecks(data) as unknown as AnyAction);
       });
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     if (!deckId) return;
@@ -103,9 +108,11 @@ export default function DeckDetailsPage() {
         setDeckData(null);
         return;
       }
-      setDeckData(JSON.parse(text));
+      const data = JSON.parse(text);
+      setDeckData(data);
+      dispatch(setSelectedDeck(data) as unknown as AnyAction);
     });
-  }, [deckId]);
+  }, [deckId, dispatch]);
 
   if (!deckId) {
     // パラメータがまだ取得できていない場合
@@ -113,7 +120,10 @@ export default function DeckDetailsPage() {
       <DashboardShell
         groups={groups}
         decks={decks}
-        setDecks={setDecks}
+        setDecks={(decks) => {
+          setDecks(decks);
+          dispatch(setDecks(decks) as unknown as AnyAction);
+        }}
         groupMode={groupMode}
         setGroupMode={setGroupMode}
       >
@@ -130,7 +140,10 @@ export default function DeckDetailsPage() {
       <DashboardShell
         groups={groups}
         decks={decks}
-        setDecks={setDecks}
+        setDecks={(decks) => {
+          setDecks(decks);
+          dispatch(setDecks(decks) as unknown as AnyAction);
+        }}
         groupMode={groupMode}
         setGroupMode={setGroupMode}
       >
@@ -195,7 +208,10 @@ export default function DeckDetailsPage() {
     <DashboardShell
       groups={groups}
       decks={decks}
-      setDecks={setDecks}
+      setDecks={(decks) => {
+        setDecks(decks);
+        dispatch(setDecks(decks) as unknown as AnyAction);
+      }}
       groupMode={groupMode}
       setGroupMode={setGroupMode}
     >

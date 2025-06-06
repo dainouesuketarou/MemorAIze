@@ -24,12 +24,17 @@ import { useRouter } from 'next/navigation';
 import { GeneratingCards } from './generating-cards';
 import { PreviewCards } from './preview-cards';
 import { toast } from '@/components/ui/toast';
+import { Group } from '@prisma/client';
 
 /* ----------------------------- 型定義 ----------------------------- */
 export interface PreviewCard {
   id: string;
   front: string;
   back: string;
+}
+
+interface AiGenerateFormProps {
+  groups: Group[];
 }
 
 /* ----------------------------- Zod スキーマ ----------------------------- */
@@ -48,14 +53,16 @@ const formSchema = z.object({
     .string()
     .max(500, { message: '追加指示は500文字以内で入力してください。' })
     .optional(),
+  groupIds: z.array(z.string()).optional(),
 });
 
 /* ===================================================================== */
 /*                                親コンポーネント                       */
 /* ===================================================================== */
-export function AiGenerateForm() {
+export function AiGenerateForm({ groups }: AiGenerateFormProps) {
   const router = useRouter();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   /* ------- フォーム関連 ------- */
   const form = useForm<z.infer<typeof formSchema>>({
@@ -66,6 +73,7 @@ export function AiGenerateForm() {
       cardFormat: 'auto',
       cardAmount: 'normal',
       additionalInstructions: '',
+      groupIds: [],
     },
   });
 
@@ -149,6 +157,14 @@ export function AiGenerateForm() {
   /* ------------------------------ 保存ハンドラ ----------------------------- */
   const handleSave = async (title: string, cards: PreviewCard[]) => {
     if (!cards.length) return;
+    if (selectedGroupIds.length === 0) {
+      toast({
+        title: 'エラー',
+        description: '少なくとも1つの分野を選択してください',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSaving(true);
     setError(null);
 
@@ -159,6 +175,10 @@ export function AiGenerateForm() {
         body: JSON.stringify({
           title,
           cards: cards.map(({ front, back }) => ({ front, back })),
+          groupIds: selectedGroupIds,
+          cardCount: cards.length,
+          progress: 0,
+          lastStudied: null,
         }),
       });
       const json = await res.json();
@@ -239,8 +259,11 @@ export function AiGenerateForm() {
           cards={cards}
           onSave={() => handleSave(title, cards)}
           isSaving={isSaving}
-          onCardsChange={setCards} /* ← 編集・削除・追加を受け取る */
-          onRegenerate={regenerateCards} /* ← 追加指示で再生成 */
+          onCardsChange={setCards}
+          onRegenerate={regenerateCards}
+          groups={groups}
+          selectedGroupIds={selectedGroupIds}
+          onGroupIdsChange={setSelectedGroupIds}
         />
       ) : (
         /* ---------- 最初の入力フォーム ---------- */
@@ -366,6 +389,49 @@ export function AiGenerateForm() {
               </FormItem>
             )}
           />
+
+          {/* -- グループ選択 -- */}
+          <div className="space-y-4">
+            <FormLabel className="text-base">分野（複数選択可）</FormLabel>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {groups.map((group) => (
+                <label
+                  key={group.id}
+                  className={cn(
+                    'relative flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200',
+                    selectedGroupIds.includes(group.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted-foreground/20 hover:border-primary/50',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={selectedGroupIds.includes(group.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedGroupIds((prev) => [...prev, group.id]);
+                      } else {
+                        setSelectedGroupIds((prev) =>
+                          prev.filter((id) => id !== group.id),
+                        );
+                      }
+                    }}
+                  />
+                  <span
+                    className={cn(
+                      'text-sm font-medium',
+                      selectedGroupIds.includes(group.id)
+                        ? 'text-primary'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {group.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           {/* -- カード形式 -- */}
           <FormField

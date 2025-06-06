@@ -21,24 +21,36 @@ import { LoaderCircle, MinusCircle, PlusCircle, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Group } from '@prisma/client';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // Form schema for the deck
 const deckFormSchema = z.object({
-  title: z.string().min(2, {
-    message: '暗記カード帳のタイトルを入力してください。',
-  }).max(50, {
-    message: 'タイトルは50文字以内で入力してください。',
-  }),
-  description: z.string().max(1000, {
-    message: '説明は1000文字以内で入力してください。',
-  }).optional(),
+  title: z
+    .string()
+    .min(2, {
+      message: '暗記カード帳のタイトルを入力してください。',
+    })
+    .max(50, {
+      message: 'タイトルは50文字以内で入力してください。',
+    }),
+  description: z
+    .string()
+    .max(1000, {
+      message: '説明は1000文字以内で入力してください。',
+    })
+    .optional(),
 });
 
 // Form schema for individual cards
 const cardFormSchema = z.object({
-  front: z.string().min(1, { message: '表面のテキストを入力してください。' })
+  front: z
+    .string()
+    .min(1, { message: '表面のテキストを入力してください。' })
     .max(100, { message: '表面は100文字以内で入力してください。' }),
-  back: z.string().min(1, { message: '裏面のテキストを入力してください。' })
+  back: z
+    .string()
+    .min(1, { message: '裏面のテキストを入力してください。' })
     .max(100, { message: '裏面は100文字以内で入力してください。' }),
 });
 
@@ -49,28 +61,25 @@ type CardType = {
   isNew?: boolean;
 };
 
-export function ManualCreateForm() {
+interface ManualCreateFormProps {
+  groups: Group[];
+}
+
+export function ManualCreateForm({ groups }: ManualCreateFormProps) {
   const router = useRouter();
   const [cards, setCards] = useState<CardType[]>([
     { id: '1', front: '', back: '', isNew: true },
   ]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentCardId, setCurrentCardId] = useState('1');
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch('/api/groups')
-      .then(res => res.json())
-      .then(data => {
-        setGroups(data);
-        if (data.length > 0) {
-          setSelectedGroupIds([data[0].id]);
-        }
-      })
-      .catch(e => console.error('グループ取得エラー:', e));
-  }, []);
-  
+    if (groups.length > 0) {
+      setSelectedGroupIds([groups[0].id]);
+    }
+  }, [groups]);
+
   // Form for deck information
   const deckForm = useForm<z.infer<typeof deckFormSchema>>({
     resolver: zodResolver(deckFormSchema),
@@ -79,7 +88,7 @@ export function ManualCreateForm() {
       description: '',
     },
   });
-  
+
   // Form for current card
   const cardForm = useForm<z.infer<typeof cardFormSchema>>({
     resolver: zodResolver(cardFormSchema),
@@ -88,46 +97,66 @@ export function ManualCreateForm() {
       back: '',
     },
   });
-  
+
   const addNewCard = () => {
     // Save current card first
-    saveCurrentCard();
-    
-    const newId = Date.now().toString();
-    const newCard = { id: newId, front: '', back: '', isNew: true };
-    setCards([...cards, newCard]);
-    setCurrentCardId(newId);
-    
-    // Reset card form
-    cardForm.reset({
-      front: '',
-      back: '',
-    });
-  };
-  
-  const saveCurrentCard = () => {
     const { front, back } = cardForm.getValues();
-    
-    if (front || back) {
-      setCards(prevCards => 
-        prevCards.map(card => 
+    if (front && back) {
+      // 両方のフィールドが入力されている場合のみ保存
+      setCards((prevCards) =>
+        prevCards.map((card) =>
           card.id === currentCardId
             ? { ...card, front, back, isNew: false }
-            : card
-        )
+            : card,
+        ),
       );
+
+      const newId = Date.now().toString();
+      const newCard = { id: newId, front: '', back: '', isNew: true };
+      setCards((prevCards) => [...prevCards, newCard]);
+      setCurrentCardId(newId);
+
+      // Reset card form
+      cardForm.reset({
+        front: '',
+        back: '',
+      });
+    } else {
+      // 入力が不完全な場合はエラーメッセージを表示
+      if (!front) {
+        cardForm.setError('front', {
+          type: 'manual',
+          message: '表面を入力してください',
+        });
+      }
+      if (!back) {
+        cardForm.setError('back', {
+          type: 'manual',
+          message: '裏面を入力してください',
+        });
+      }
     }
   };
-  
+
   const selectCard = (cardId: string) => {
     // Save current card before switching
-    saveCurrentCard();
-    
+    const { front, back } = cardForm.getValues();
+    if (front && back) {
+      // 両方のフィールドが入力されている場合のみ保存
+      setCards((prevCards) =>
+        prevCards.map((card) =>
+          card.id === currentCardId
+            ? { ...card, front, back, isNew: false }
+            : card,
+        ),
+      );
+    }
+
     // Set the selected card
     setCurrentCardId(cardId);
-    
+
     // Find the selected card and populate the form
-    const selectedCard = cards.find(card => card.id === cardId);
+    const selectedCard = cards.find((card) => card.id === cardId);
     if (selectedCard) {
       cardForm.reset({
         front: selectedCard.front,
@@ -135,21 +164,23 @@ export function ManualCreateForm() {
       });
     }
   };
-  
+
   const removeCard = (cardId: string) => {
     if (cards.length <= 1) {
       return; // Don't remove the last card
     }
-    
-    const remainingCards = cards.filter(card => card.id !== cardId);
+
+    const remainingCards = cards.filter((card) => card.id !== cardId);
     setCards(remainingCards);
-    
+
     // If the current card is removed, select another card
     if (currentCardId === cardId) {
       const newCurrentId = remainingCards[0]?.id || '';
       setCurrentCardId(newCurrentId);
-      
-      const newCurrentCard = remainingCards.find(card => card.id === newCurrentId);
+
+      const newCurrentCard = remainingCards.find(
+        (card) => card.id === newCurrentId,
+      );
       if (newCurrentCard) {
         cardForm.reset({
           front: newCurrentCard.front,
@@ -158,11 +189,32 @@ export function ManualCreateForm() {
       }
     }
   };
-  
+
   const onSubmit = async (deckValues: z.infer<typeof deckFormSchema>) => {
-    saveCurrentCard();
-    const validCards = cards.filter(card => card.front && card.back);
-    if (validCards.length === 0) return;
+    // Save the current card before submitting
+    const { front, back } = cardForm.getValues();
+    if (front && back) {
+      // 両方のフィールドが入力されている場合のみ保存
+      setCards((prevCards) =>
+        prevCards.map((card) =>
+          card.id === currentCardId
+            ? { ...card, front, back, isNew: false }
+            : card,
+        ),
+      );
+    }
+
+    const validCards = cards.filter((card) => card.front && card.back);
+    if (validCards.length === 0) {
+      toast.error('少なくとも1枚のカードを作成してください');
+      return;
+    }
+
+    if (selectedGroupIds.length === 0) {
+      toast.error('少なくとも1つの分野を選択してください');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch('/api/decks', {
@@ -175,13 +227,19 @@ export function ManualCreateForm() {
           cardCount: validCards.length,
           progress: 0,
           lastStudied: null,
-          cards: validCards.map(card => ({ front: card.front, back: card.back }))
-        })
+          cards: validCards.map((card) => ({
+            front: card.front,
+            back: card.back,
+          })),
+        }),
       });
       if (!res.ok) {
         const errorData = await res.json();
         console.error('APIエラー:', errorData);
-        alert('保存に失敗しました: ' + (errorData.detail || errorData.error || '不明なエラー'));
+        toast.error(
+          '保存に失敗しました: ' +
+            (errorData.detail || errorData.error || '不明なエラー'),
+        );
         setIsLoading(false);
         return;
       }
@@ -190,10 +248,12 @@ export function ManualCreateForm() {
     } catch (e) {
       setIsLoading(false);
       console.error('通信エラー:', e);
-      alert('保存に失敗しました: ' + (e instanceof Error ? e.message : String(e)));
+      toast.error(
+        '保存に失敗しました: ' + (e instanceof Error ? e.message : String(e)),
+      );
     }
   };
-  
+
   return (
     <div className="space-y-8">
       {/* Deck Information Form */}
@@ -206,14 +266,18 @@ export function ManualCreateForm() {
               <FormItem>
                 <FormLabel>暗記カード帳のタイトル</FormLabel>
                 <FormControl>
-                  <Input placeholder="例）英検準一級英単語" maxLength={50} {...field} />
+                  <Input
+                    placeholder="例）英検準一級英単語"
+                    maxLength={50}
+                    {...field}
+                  />
                 </FormControl>
                 <FormDescription>50文字以内で入力してください</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={deckForm.control}
             name="description"
@@ -235,32 +299,52 @@ export function ManualCreateForm() {
               </FormItem>
             )}
           />
-          
-          {/* グループ選択チェックボックス */}
-          <div>
-            <label className="block text-sm font-medium mb-1">分野（複数選択可）</label>
-            <div className="flex flex-wrap gap-2">
-              {groups.map(group => (
-                <label key={group.id} className="flex items-center gap-1 cursor-pointer">
+
+          {/* グループ選択 */}
+          <div className="space-y-4">
+            <FormLabel className="text-base">分野（複数選択可）</FormLabel>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {groups.map((group) => (
+                <label
+                  key={group.id}
+                  className={cn(
+                    'relative flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200',
+                    selectedGroupIds.includes(group.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted-foreground/20 hover:border-primary/50',
+                  )}
+                >
                   <input
                     type="checkbox"
+                    className="sr-only"
                     checked={selectedGroupIds.includes(group.id)}
-                    onChange={e => {
+                    onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedGroupIds(prev => [...prev, group.id]);
+                        setSelectedGroupIds((prev) => [...prev, group.id]);
                       } else {
-                        setSelectedGroupIds(prev => prev.filter(id => id !== group.id));
+                        setSelectedGroupIds((prev) =>
+                          prev.filter((id) => id !== group.id),
+                        );
                       }
                     }}
                   />
-                  <span>{group.name}</span>
+                  <span
+                    className={cn(
+                      'text-sm font-medium',
+                      selectedGroupIds.includes(group.id)
+                        ? 'text-primary'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {group.name}
+                  </span>
                 </label>
               ))}
             </div>
           </div>
         </form>
       </Form>
-      
+
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium">カード ({cards.length}枚)</h3>
@@ -274,7 +358,7 @@ export function ManualCreateForm() {
             カードを追加
           </Button>
         </div>
-        
+
         {/* Card list */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-60 overflow-y-auto p-2">
           {cards.map((card, index) => (
@@ -310,23 +394,12 @@ export function ManualCreateForm() {
             </Card>
           ))}
         </div>
-        
+
         {/* Current card editing form */}
         <Form {...cardForm}>
           <form className="space-y-4 p-4 border rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-              <h4 className="font-medium">カード編集</h4>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => saveCurrentCard()}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                保存
-              </Button>
-            </div>
-            
+            <h4 className="font-medium">カード編集</h4>
+
             <FormField
               control={cardForm.control}
               name="front"
@@ -341,12 +414,14 @@ export function ManualCreateForm() {
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>100文字以内で入力してください</FormDescription>
+                  <FormDescription>
+                    100文字以内で入力してください
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={cardForm.control}
               name="back"
@@ -361,7 +436,9 @@ export function ManualCreateForm() {
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>100文字以内で入力してください</FormDescription>
+                  <FormDescription>
+                    100文字以内で入力してください
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -369,7 +446,7 @@ export function ManualCreateForm() {
           </form>
         </Form>
       </div>
-      
+
       <Button
         onClick={() => deckForm.handleSubmit(onSubmit)()}
         className="w-full"

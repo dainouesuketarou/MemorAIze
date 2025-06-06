@@ -2,11 +2,18 @@
 
 import { AlertCircle, Brain, LoaderCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAiGenerationLimit } from '@/hooks/use-ai-generation-limit';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import {
+  setLimit,
+  setLoading,
+  setError,
+} from '@/lib/store/slices/aiGenerationLimitSlice';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import Link from 'next/link';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useEffect } from 'react';
 
 /**
  * ヘッダー用のコンパクト表示
@@ -19,8 +26,30 @@ export function AiLimitBadge({
   className?: string;
   hideInStudy?: boolean;
 }) {
-  const { limit, loading } = useAiGenerationLimit();
+  const dispatch = useDispatch();
+  const { limit, isLoading } = useSelector(
+    (state: RootState) => state.aiGenerationLimit,
+  );
   const subscription = useSubscription();
+  const userId = useSelector((state: RootState) => state.user.id);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchLimit = async () => {
+      try {
+        const res = await fetch(`/api/ai-generation-limit?userId=${userId}`);
+        if (!res.ok) throw new Error('AI生成制限の取得に失敗しました');
+        const data = await res.json();
+        dispatch(setLimit(data));
+      } catch (error) {
+        console.error('AI生成制限取得エラー:', error);
+        dispatch(setError('AI生成制限の取得に失敗しました'));
+      }
+    };
+
+    fetchLimit();
+  }, [userId, dispatch]);
 
   // 学習画面では表示しない
   if (hideInStudy) return null;
@@ -28,7 +57,7 @@ export function AiLimitBadge({
   const isProUser =
     subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className="mb-4">
         <CardContent className="p-4">
@@ -48,7 +77,7 @@ export function AiLimitBadge({
 
   if (!limit) return null;
 
-  const isNearLimit = limit.count >= limit.limit * 0.8; // 80%以上使用で警告表示
+  const isNearLimit = limit.dailyUsage >= limit.dailyLimit * 0.8; // 80%以上使用で警告表示
 
   return (
     <Card className="mb-4">
@@ -80,7 +109,7 @@ export function AiLimitBadge({
                 />
                 <div>
                   <p className="text-sm font-medium">
-                    今月のAI生成回数: {limit.count}/{limit.limit}回
+                    今日のAI生成回数: {limit.dailyUsage}/{limit.dailyLimit}回
                   </p>
                   <p
                     className={cn(
@@ -88,7 +117,7 @@ export function AiLimitBadge({
                       isNearLimit ? 'text-red-500' : 'text-muted-foreground',
                     )}
                   >
-                    残り{limit.limit - limit.count}回生成できます
+                    残り{limit.dailyLimit - limit.dailyUsage}回生成できます
                   </p>
                 </div>
               </div>
