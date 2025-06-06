@@ -71,7 +71,15 @@ export default function BillingPage() {
           toast.error('認証が必要です。再度ログインしてください。');
           return;
         }
-        throw new Error(data.error || 'ポータルセッションの作成に失敗しました');
+        if (response.status === 400) {
+          toast.error(data.error || 'Stripeの処理に失敗しました');
+          return;
+        }
+        throw new Error(
+          data.error ||
+            data.details ||
+            'ポータルセッションの作成に失敗しました',
+        );
       }
 
       if (!data.url) {
@@ -184,12 +192,6 @@ export default function BillingPage() {
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => router.push('/subscription')}
-              >
-                プランを変更
-              </Button>
               <Button onClick={handleManageSubscription}>
                 サブスクリプションを管理
               </Button>
