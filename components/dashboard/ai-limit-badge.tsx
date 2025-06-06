@@ -6,11 +6,7 @@ import { useAiGenerationLimit } from '@/hooks/use-ai-generation-limit';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import Link from 'next/link';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '@/lib/store/store';
-import { useEffect, useState } from 'react';
-import { Subscription } from '@prisma/client';
-import { setSubscription } from '@/lib/store/slices/userSlice';
+import { useSubscription } from '@/hooks/use-subscription';
 
 /**
  * ヘッダー用のコンパクト表示
@@ -24,32 +20,7 @@ export function AiLimitBadge({
   hideInStudy?: boolean;
 }) {
   const { limit, loading } = useAiGenerationLimit();
-  const subscription = useSelector(
-    (state: RootState) => state.user.subscription,
-  );
-  const dispatch = useDispatch();
-
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        // サブスクリプション情報を取得
-        const subscriptionResponse = await fetch('/api/subscription/status');
-        if (!subscriptionResponse.ok) {
-          throw new Error('サブスクリプション情報の取得に失敗しました');
-        }
-
-        const subscriptionData: Subscription =
-          await subscriptionResponse.json();
-
-        // Reduxの状態を更新
-        dispatch(setSubscription(subscriptionData));
-      } catch (error) {
-        console.error('サブスクリプション情報の取得に失敗しました:', error);
-      }
-    };
-
-    fetchSubscription();
-  }, [dispatch]);
+  const subscription = useSubscription();
 
   // 学習画面では表示しない
   if (hideInStudy) return null;

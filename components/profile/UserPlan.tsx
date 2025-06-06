@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { Subscription } from '@prisma/client';
 import { setSubscription } from '@/lib/store/slices/userSlice';
+import { useSubscription } from '@/hooks/use-subscription';
 import { cn } from '@/lib/utils';
 
 interface PlanFeatures {
@@ -62,33 +63,31 @@ const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
 
 export const UserPlan: React.FC = () => {
   const router = useRouter();
-  const subscription = useSelector(
-    (state: RootState) => state.user.subscription,
-  );
+  const subscription = useSubscription();
   const dispatch = useDispatch();
   const currentPlan = subscription?.plan || 'FREE';
   const planFeatures = PLAN_FEATURES[currentPlan];
 
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        // サブスクリプション情報を取得
-        const subscriptionResponse = await fetch('/api/subscription/status');
-        if (!subscriptionResponse.ok) {
-          throw new Error('サブスクリプション情報の取得に失敗しました');
-        }
+  // useEffect(() => {
+  //   const fetchSubscription = async () => {
+  //     try {
+  //       // サブスクリプション情報を取得
+  //       const subscriptionResponse = await fetch('/api/subscription/status');
+  //       if (!subscriptionResponse.ok) {
+  //         throw new Error('サブスクリプション情報の取得に失敗しました');
+  //       }
 
-        const subscriptionData: Subscription =
-          await subscriptionResponse.json();
+  //       const subscriptionData: Subscription =
+  //         await subscriptionResponse.json();
 
-        // Reduxの状態を更新
-        dispatch(setSubscription(subscriptionData));
-      } catch (error) {
-        console.error('サブスクリプション情報の取得に失敗しました:', error);
-      }
-    };
-    fetchSubscription();
-  }, []);
+  //       // Reduxの状態を更新
+  //       dispatch(setSubscription(subscriptionData));
+  //     } catch (error) {
+  //       console.error('サブスクリプション情報の取得に失敗しました:', error);
+  //     }
+  //   };
+  //   fetchSubscription();
+  // }, []);
 
   const handlePlanChange = () => {
     router.push('/subscription');

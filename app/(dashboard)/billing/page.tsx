@@ -29,45 +29,14 @@ import {
 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { setSubscription } from '@/lib/store/slices/userSlice';
-
-export type SubscriptionStatus =
-  | 'ACTIVE'
-  | 'CANCELED'
-  | 'PAST_DUE'
-  | 'UNPAID'
-  | 'TRIALING';
-export type SubscriptionPlan = 'FREE' | 'PRO_MONTHLY' | 'PRO_YEARLY';
-
-interface Subscription {
-  id: string;
-  plan: SubscriptionPlan;
-  status: SubscriptionStatus;
-  stripeSubscriptionId: string | null;
-  stripePriceId: string | null;
-  stripeCurrentPeriodEnd: Date | null;
-  cancelAtPeriodEnd: boolean;
-  stripeCustomerId: string | null;
-}
-
-type PaymentMethod = {
-  id: string;
-  brand: string;
-  last4: string;
-  expMonth: number;
-  expYear: number;
-  isDefault: boolean;
-};
+import { useSubscription } from '@/hooks/use-subscription';
+import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 
 export default function BillingPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [subscription, setSubscriptionState] = useState<Subscription | null>(
-    null,
-  );
+  const subscription = useSubscription();
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -75,29 +44,6 @@ export default function BillingPage() {
       router.push('/login');
     }
   }, [status, router]);
-
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        const response = await fetch('/api/subscription/status');
-        if (!response.ok) {
-          throw new Error('サブスクリプション情報の取得に失敗しました');
-        }
-        const data = await response.json();
-        setSubscriptionState(data);
-        dispatch(setSubscription(data));
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-        toast.error('サブスクリプション情報の取得に失敗しました');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (session?.user) {
-      fetchSubscription();
-    }
-  }, [session, dispatch]);
 
   const handleCancel = async () => {
     if (!subscription) return;
@@ -123,16 +69,16 @@ export default function BillingPage() {
 
       toast.success(data.message || 'サブスクリプションをキャンセルしました');
 
-      const updatedSubscription: Subscription = {
-        ...subscription,
-        status: 'CANCELED',
-        cancelAtPeriodEnd: true,
+      const updatedSubscription = {
+        status: 'CANCELED' as SubscriptionStatus,
+        plan: subscription.plan,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        stripePriceId: subscription.stripePriceId,
         stripeCurrentPeriodEnd: data.currentPeriodEnd
           ? new Date(data.currentPeriodEnd)
           : null,
       };
 
-      setSubscriptionState(updatedSubscription);
       dispatch(setSubscription(updatedSubscription));
     } catch (error) {
       console.error('Cancel error:', error);
@@ -149,10 +95,6 @@ export default function BillingPage() {
       }
     }
   };
-
-  const formatCardNumber = (last4: string) => `**** **** **** ${last4}`;
-  const formatExpiryDate = (month: number, year: number) =>
-    `${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
 
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return 'なし';
@@ -178,10 +120,7 @@ export default function BillingPage() {
 
   const isProPlan =
     subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';
-  const canCancel =
-    isProPlan &&
-    subscription?.status === 'ACTIVE' &&
-    !subscription?.cancelAtPeriodEnd;
+  const canCancel = isProPlan && subscription?.status === 'ACTIVE';
 
   return (
     <div className="min-h-screen bg-primary/5">
@@ -224,9 +163,7 @@ export default function BillingPage() {
                     {subscription?.status === 'ACTIVE'
                       ? '有効'
                       : subscription?.status === 'CANCELED'
-                      ? subscription?.cancelAtPeriodEnd
-                        ? 'キャンセル済み'
-                        : 'キャンセル済み（利用中）'
+                      ? 'キャンセル済み'
                       : subscription?.status === 'PAST_DUE'
                       ? '支払い期限切れ'
                       : subscription?.status === 'TRIALING'
