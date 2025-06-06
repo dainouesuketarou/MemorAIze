@@ -120,13 +120,7 @@ export default function DashboardPage() {
   }, [reduxDecks, selectedGroup, reduxFilter, reduxSort]);
 
   return (
-    <DashboardShell
-      groups={reduxGroups}
-      decks={reduxDecks as DeckWithCardsAndGroups[]}
-      setDecks={(decks: DeckWithCardsAndGroups[]) => dispatch(setDecks(decks))}
-      groupMode={groupMode}
-      setGroupMode={setGroupMode}
-    >
+    <DashboardShell groupMode={groupMode} setGroupMode={setGroupMode}>
       <div className="space-y-6">
         <DashboardHeader
           heading="マイデッキ"

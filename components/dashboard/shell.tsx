@@ -33,15 +33,11 @@ import {
   setGroups,
   setLoading as setGroupsLoading,
 } from '@/lib/store/slices/groupSlice';
-import { AnyAction } from '@reduxjs/toolkit';
 
 interface DashboardShellProps {
   children: React.ReactNode;
   fullWidth?: boolean;
-  groups: Group[];
-  decks: DeckWithCardsAndGroups[];
   groupMode: boolean;
-  setDecks: (decks: DeckWithCardsAndGroups[]) => void;
   setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -70,9 +66,6 @@ const getRelativeTime = (date: Date | string) => {
 export function DashboardShell({
   children,
   fullWidth = false,
-  groups,
-  decks,
-  setDecks,
   groupMode,
   setGroupMode,
 }: DashboardShellProps) {
@@ -82,6 +75,7 @@ export function DashboardShell({
   const [showResults, setShowResults] = useState(false);
   const [limit, setLimit] = useState<AiGenerationLimit | null>(null);
   const [loading, setLoading] = useState(true);
+  const [decks] = useState<DeckWithCardsAndGroups[]>([]);
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardPage = pathname === '/dashboard';
@@ -115,7 +109,7 @@ export function DashboardShell({
             lastStudied: deck.lastStudied ? String(deck.lastStudied) : null,
             groups: deck.groups || [],
           }));
-          dispatch(setDecks(formattedDecks) as unknown as AnyAction);
+          dispatch(setDecks(formattedDecks));
         }
 
         // グループの取得
