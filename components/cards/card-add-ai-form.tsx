@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -27,6 +27,8 @@ import { LoaderCircle, MinusCircle, PlusCircle } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
 import { PreviewCard } from './ai-generate-form';
 import { PreviewCards } from './preview-cards';
+import { cn } from '@/lib/utils';
+import { Group } from '@prisma/client';
 
 const formSchema = z.object({
   content: z
@@ -43,17 +45,25 @@ const formSchema = z.object({
 
 interface Props {
   deckId: string | string[];
+  groups: Group[];
   onSuccess: (data: { title: string; cards: any[] }) => void;
 }
 
-export function CardAddAiForm({ deckId, onSuccess }: Props) {
+export function CardAddAiForm({ deckId, groups, onSuccess }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [generated, setGenerated] = useState<{
     cards: PreviewCard[];
   } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (groups.length > 0) {
+      setSelectedGroupIds([groups[0].id]);
+    }
+  }, [groups]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,6 +119,14 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
 
   const handleSave = async () => {
     if (!generated) return;
+    if (selectedGroupIds.length === 0) {
+      toast({
+        title: 'エラー',
+        description: '少なくとも1つの分野を選択してください',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch('/api/cards/save', {
@@ -117,6 +135,7 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
         body: JSON.stringify({
           deckId,
           cards: generated.cards,
+          groupIds: selectedGroupIds,
         }),
       });
       const json = await res.json();
@@ -434,6 +453,49 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
             )}
           />
 
+          {/* グループ選択 */}
+          <div className="space-y-4">
+            <FormLabel className="text-base">分野（複数選択可）</FormLabel>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {groups.map((group) => (
+                <label
+                  key={group.id}
+                  className={cn(
+                    'relative flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200',
+                    selectedGroupIds.includes(group.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted-foreground/20 hover:border-primary/50',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={selectedGroupIds.includes(group.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedGroupIds((prev) => [...prev, group.id]);
+                      } else {
+                        setSelectedGroupIds((prev) =>
+                          prev.filter((id) => id !== group.id),
+                        );
+                      }
+                    }}
+                  />
+                  <span
+                    className={cn(
+                      'text-sm font-medium',
+                      selectedGroupIds.includes(group.id)
+                        ? 'text-primary'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {group.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
@@ -462,6 +524,9 @@ export function CardAddAiForm({ deckId, onSuccess }: Props) {
               onCardsChange={handleSaveCards}
               isSaving={isLoading}
               onClose={() => setPreviewOpen(false)}
+              groups={groups}
+              selectedGroupIds={selectedGroupIds}
+              onGroupIdsChange={setSelectedGroupIds}
             />
           </DialogContent>
         </Dialog>
