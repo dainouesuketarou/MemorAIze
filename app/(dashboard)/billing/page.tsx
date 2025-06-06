@@ -52,53 +52,39 @@ export default function BillingPage() {
     }
   }, [subscription]);
 
-  const handleCancel = async () => {
-    if (!subscription) return;
-
+  const handleManageSubscription = async () => {
     try {
-      const response = await fetch('/api/subscription/cancel', {
+      const response = await fetch('/api/subscription/portal', {
         method: 'POST',
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.error?.includes('incomplete')) {
+        if (response.status === 404) {
           toast.error(
-            '支払いが完了していないため、キャンセルできません。支払いを完了してください。',
+            'Stripeの顧客情報が見つかりません。サポートにお問い合わせください。',
           );
           return;
         }
-        throw new Error(
-          data.error || 'サブスクリプションのキャンセルに失敗しました',
-        );
+        if (response.status === 401) {
+          toast.error('認証が必要です。再度ログインしてください。');
+          return;
+        }
+        throw new Error(data.error || 'ポータルセッションの作成に失敗しました');
       }
 
-      toast.success(data.message || 'サブスクリプションをキャンセルしました');
+      if (!data.url) {
+        throw new Error('ポータルURLが取得できませんでした');
+      }
 
-      const updatedSubscription = {
-        status: 'CANCELED' as SubscriptionStatus,
-        plan: subscription.plan,
-        stripeSubscriptionId: subscription.stripeSubscriptionId,
-        stripePriceId: subscription.stripePriceId,
-        stripeCurrentPeriodEnd: data.currentPeriodEnd
-          ? new Date(data.currentPeriodEnd)
-          : null,
-      };
-
-      dispatch(setSubscription(updatedSubscription));
+      window.location.href = data.url;
     } catch (error) {
-      console.error('Cancel error:', error);
+      console.error('Portal session error:', error);
       if (error instanceof Error) {
-        if (error.message.includes('incomplete')) {
-          toast.error(
-            '支払いが完了していないため、キャンセルできません。支払いを完了してください。',
-          );
-        } else {
-          toast.error(error.message);
-        }
+        toast.error(error.message);
       } else {
-        toast.error('サブスクリプションのキャンセルに失敗しました');
+        toast.error('サブスクリプション管理ページへの遷移に失敗しました');
       }
     }
   };
@@ -123,7 +109,6 @@ export default function BillingPage() {
 
   const isProPlan =
     subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';
-  const canCancel = isProPlan && subscription?.status === 'ACTIVE';
 
   return (
     <div className="min-h-screen bg-primary/5">
@@ -205,11 +190,9 @@ export default function BillingPage() {
               >
                 プランを変更
               </Button>
-              {canCancel && (
-                <Button variant="destructive" onClick={handleCancel}>
-                  Freeに戻る
-                </Button>
-              )}
+              <Button onClick={handleManageSubscription}>
+                サブスクリプションを管理
+              </Button>
             </CardFooter>
           </Card>
         </div>
