@@ -31,6 +31,7 @@ import { useDispatch } from 'react-redux';
 import { setSubscription } from '@/lib/store/slices/userSlice';
 import { useSubscription } from '@/hooks/use-subscription';
 import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
+import { Loading } from '@/components/loading';
 
 export default function BillingPage() {
   const { data: session, status } = useSession();
@@ -44,6 +45,12 @@ export default function BillingPage() {
       router.push('/login');
     }
   }, [status, router]);
+
+  useEffect(() => {
+    if (subscription !== undefined) {
+      setIsLoading(false);
+    }
+  }, [subscription]);
 
   const handleCancel = async () => {
     if (!subscription) return;
@@ -110,12 +117,8 @@ export default function BillingPage() {
     return endDate.toLocaleDateString('ja-JP');
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+  if (isLoading || status === 'loading') {
+    return <Loading />;
   }
 
   const isProPlan =
