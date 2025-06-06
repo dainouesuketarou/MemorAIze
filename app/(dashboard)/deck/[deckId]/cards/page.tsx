@@ -296,11 +296,16 @@ export default function CardsPage() {
               <TabsTrigger value="manual">手動で作成</TabsTrigger>
             </TabsList>
             <TabsContent value="ai">
-              <CardAddAiForm deckId={deckId} onSuccess={handleCardAddSuccess} />
+              <CardAddAiForm
+                deckId={deckId}
+                groups={groups}
+                onSuccess={handleCardAddSuccess}
+              />
             </TabsContent>
             <TabsContent value="manual">
               <CardAddManualForm
                 deckId={deckId}
+                groups={groups}
                 onSuccess={handleCardAddSuccess}
               />
             </TabsContent>
