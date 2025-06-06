@@ -1,5 +1,10 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import {
+  createSlice,
+  PayloadAction,
+  ActionCreatorWithPayload,
+} from '@reduxjs/toolkit';
 import { Group } from '@prisma/client';
+import { DeckWithCardsAndGroups } from '@/types/deck';
 
 export interface Card {
   id: string;
@@ -10,28 +15,13 @@ export interface Card {
   favorite: boolean;
 }
 
-export interface Deck {
-  id: string;
-  title: string;
-  description: string | null;
-  cardCount: number;
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-  groups?: Group[];
-  shareCode?: string | null;
-  progress: number;
-  lastStudied: Date | null;
-  cards?: Card[];
-}
-
 interface DeckState {
-  decks: Deck[];
+  decks: DeckWithCardsAndGroups[];
   isLoading: boolean;
   error: string | null;
   filter: 'all' | 'inProgress' | 'completed' | 'notStarted';
   sort: 'recent' | 'alphabetical' | 'cardCount';
-  selectedDeck: Deck | null;
+  selectedDeck: DeckWithCardsAndGroups | null;
 }
 
 const initialState: DeckState = {
@@ -47,15 +37,15 @@ const deckSlice = createSlice({
   name: 'deck',
   initialState,
   reducers: {
-    setDecks: (state, action: PayloadAction<Deck[]>) => {
+    setDecks: (state, action: PayloadAction<DeckWithCardsAndGroups[]>) => {
       state.decks = action.payload;
       state.isLoading = false;
       state.error = null;
     },
-    addDeck: (state, action: PayloadAction<Deck>) => {
+    addDeck: (state, action: PayloadAction<DeckWithCardsAndGroups>) => {
       state.decks.push(action.payload);
     },
-    updateDeck: (state, action: PayloadAction<Deck>) => {
+    updateDeck: (state, action: PayloadAction<DeckWithCardsAndGroups>) => {
       const index = state.decks.findIndex(
         (deck) => deck.id === action.payload.id,
       );
@@ -85,7 +75,10 @@ const deckSlice = createSlice({
     setSort: (state, action: PayloadAction<DeckState['sort']>) => {
       state.sort = action.payload;
     },
-    setSelectedDeck: (state, action: PayloadAction<Deck | null>) => {
+    setSelectedDeck: (
+      state,
+      action: PayloadAction<DeckWithCardsAndGroups | null>,
+    ) => {
       state.selectedDeck = action.payload;
     },
     updateDeckProgress: (
@@ -95,11 +88,11 @@ const deckSlice = createSlice({
       const deck = state.decks.find((d) => d.id === action.payload.deckId);
       if (deck) {
         deck.progress = action.payload.progress;
-        deck.lastStudied = new Date();
+        deck.lastStudied = new Date().toISOString();
       }
       if (state.selectedDeck?.id === action.payload.deckId) {
         state.selectedDeck.progress = action.payload.progress;
-        state.selectedDeck.lastStudied = new Date();
+        state.selectedDeck.lastStudied = new Date().toISOString();
       }
     },
   },
@@ -118,4 +111,7 @@ export const {
   updateDeckProgress,
 } = deckSlice.actions;
 
+export type DeckAction = ReturnType<
+  (typeof deckSlice.actions)[keyof typeof deckSlice.actions]
+>;
 export default deckSlice.reducer;

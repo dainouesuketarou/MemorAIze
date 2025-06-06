@@ -9,13 +9,13 @@ import { DeckList } from '@/components/dashboard/deck-list';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
-import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
+import { DeckWithCardsAndGroups } from '@/types/deck';
 import { useSession } from 'next-auth/react';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { DeckFilter } from '@/components/dashboard/deck-filter';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '@/lib/store/store';
+import { RootState, AppDispatch } from '@/lib/store/store';
 import {
   setDecks,
   setLoading,
@@ -25,11 +25,10 @@ import {
 } from '@/lib/store/slices/deckSlice';
 import { setGroups } from '@/lib/store/slices/groupSlice';
 import { AnyAction } from '@reduxjs/toolkit';
-import { Deck } from '@/lib/store/slices/deckSlice';
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const {
     decks: reduxDecks,
     isLoading: decksLoading,
@@ -54,7 +53,13 @@ export default function DashboardPage() {
         const decksRes = await fetch('/api/decks');
         if (!decksRes.ok) throw new Error('デッキ一覧の取得に失敗しました');
         const decksData = await decksRes.json();
-        dispatch(setDecks(decksData));
+        const formattedDecks = decksData.map((deck: any) => ({
+          ...deck,
+          cards: deck.cards || [],
+          lastStudied: deck.lastStudied ? String(deck.lastStudied) : null,
+          groups: deck.groups || [],
+        }));
+        dispatch(setDecks(formattedDecks));
 
         // グループの取得
         const groupsRes = await fetch(`/api/groups?userId=${session.user.id}`);
@@ -118,9 +123,7 @@ export default function DashboardPage() {
     <DashboardShell
       groups={reduxGroups}
       decks={reduxDecks as DeckWithCardsAndGroups[]}
-      setDecks={(decks) =>
-        dispatch(setDecks(decks as Deck[]) as unknown as AnyAction)
-      }
+      setDecks={(decks: DeckWithCardsAndGroups[]) => dispatch(setDecks(decks))}
       groupMode={groupMode}
       setGroupMode={setGroupMode}
     >
@@ -149,11 +152,11 @@ export default function DashboardPage() {
         <div className="py-4 pl-4 pr-8 flex lg:flex-row gap-5">
           <div className="w-4/5 lg:w-10/12">
             <DeckList
-              decks={filteredAndSortedDecks as DeckWithCardsAndGroups[]}
+              decks={filteredAndSortedDecks}
               groupMode={groupMode}
               groups={reduxGroups}
-              setDecks={(decks) =>
-                dispatch(setDecks(decks as Deck[]) as unknown as AnyAction)
+              setDecks={(decks: DeckWithCardsAndGroups[]) =>
+                dispatch(setDecks(decks))
               }
             />
           </div>

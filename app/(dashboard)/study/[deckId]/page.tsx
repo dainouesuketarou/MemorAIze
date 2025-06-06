@@ -2,13 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { DashboardShell } from '@/components/dashboard/shell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Star, Volume2, Cog } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Group, FilterMode } from '@prisma/client';
-import { DeckWithCardsAndGroups } from '@/types/deck';
+import { FilterMode } from '@prisma/client';
 import { speakFrontOrBack, extractPlainText, speak } from '@/lib/speech';
 import { SettingModal } from '@/components/study/SettingModal';
 import { useDeckSetting } from '@/hooks/useDeckSetting';
@@ -23,6 +21,7 @@ import { updateDeckProgress } from '@/lib/store/slices/deckSlice';
 import { AnyAction } from '@reduxjs/toolkit';
 import { MathRenderer } from '@/components/common/MathRenderer';
 import { MathText } from '@/components/common/MathText';
+import { HeaderNav } from '@/components/dashboard/header-nav';
 
 /* ------------ 型 ------------ */
 type CardType = {
@@ -57,9 +56,8 @@ export default function StudyPage() {
   );
 
   /* ---------- 全体状態 ---------- */
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   /* ---------- カード ---------- */
   const [rawCards, setRawCards] = useState<CardType[]>([]);
@@ -102,16 +100,20 @@ export default function StudyPage() {
   const dragTimeoutRef = useRef<NodeJS.Timeout>();
   const touchStartPosRef = useRef<TouchPosition | null>(null);
 
-  /* ============ 初期取得 ============ */
+  // スクロールイベント
   useEffect(() => {
-    fetch('/api/groups')
-      .then((r) => r.json())
-      .then(setGroups);
-    fetch('/api/decks')
-      .then((r) => r.json())
-      .then((d) =>
-        setDecks(d.map((v: any) => ({ ...v, cards: v.cards ?? [] }))),
-      );
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setScrolled(window.scrollY > 10);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   /* ============ デッキ取得 ============ */
@@ -453,235 +455,96 @@ export default function StudyPage() {
   /* ============ ローディング / 0枚 ============ */
   if (loading || isTransitioning)
     return (
-      <DashboardShell
-        groups={groups}
-        decks={decks}
-        setDecks={setDecks}
-        groupMode={groupMode}
-        setGroupMode={setGroupMode}
-      >
-        <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-lg text-muted-foreground">
-            {isTransitioning ? '学習結果を保存中...' : 'カードを取得中...'}
-          </p>
-        </div>
-      </DashboardShell>
+      <div className="min-h-screen flex flex-col">
+        <HeaderNav
+          groupMode={groupMode}
+          setGroupMode={setGroupMode}
+          scrolled={scrolled}
+        />
+        <main className="flex-1 flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-lg text-muted-foreground">
+              {isTransitioning ? '学習結果を保存中...' : 'カードを取得中...'}
+            </p>
+          </div>
+        </main>
+      </div>
     );
   if (!currentCard)
     return (
-      <DashboardShell
-        groups={groups}
-        decks={decks}
-        setDecks={setDecks}
-        groupMode={groupMode}
-        setGroupMode={setGroupMode}
-      >
-        <div className="flex items-center justify-center h-[80vh]">
+      <div className="min-h-screen flex flex-col">
+        <HeaderNav
+          groupMode={groupMode}
+          setGroupMode={setGroupMode}
+          scrolled={scrolled}
+        />
+        <main className="flex-1 flex items-center justify-center">
           <Card className="p-6">
             <p className="text-lg">カードが見つかりません</p>
           </Card>
-        </div>
-      </DashboardShell>
+        </main>
+      </div>
     );
 
   /* ============ 画面 ============ */
   return (
-    <DashboardShell
-      groups={groups}
-      decks={decks}
-      setDecks={setDecks}
-      groupMode={groupMode}
-      setGroupMode={setGroupMode}
-    >
-      {/* ヘッダー部分 */}
-      <div className="w-full mb-4 sm:mb-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{currentIndex + 1}</span>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-muted-foreground">{totalCards}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setSettingOpen(true)}
-              variant="ghost"
-              size="icon"
-            >
-              <Cog className="h-6 w-6" />
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/dashboard')}
-              className="rounded-full px-4 sm:px-6"
-            >
-              終了
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleRestart}
-              className="rounded-full px-4 sm:px-6"
-            >
-              再スタート
-            </Button>
-          </div>
-        </div>
-        <div className="h-2 rounded-full overflow-hidden bg-muted">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </div>
-
-      {/* カード部分 */}
-      <style>{cardFlipStyles}</style>
-      <div className="w-full relative">
-        <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr_120px] gap-4 min-h-[400px] sm:h-[500px]">
-          {/* PC表示時の左ボタン */}
-          <Button
-            variant="ghost"
-            className={cn(
-              'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
-              showAnswer
-                ? 'bg-red-500 hover:bg-red-600 text-white'
-                : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
-            )}
-            onClick={handleIncorrect}
-          >
-            {showAnswer ? '不正解' : '分からない'}
-          </Button>
-
-          {/* カード本体 */}
-          <div
-            className={cn(
-              'relative flex-1 study-flip-card',
-              showAnswer && 'flipped',
-            )}
-            style={{ minHeight: '300px', height: '100%' }}
-            onClick={() => setShowAnswer((p) => !p)}
-            onTouchStart={(e) => {
-              const touch = e.touches[0];
-              handleDragStart(touch.clientX, touch.clientY);
-            }}
-            onTouchMove={(e) => {
-              const touch = e.touches[0];
-              handleDrag(touch.clientX, touch.clientY);
-            }}
-            onTouchEnd={() => handleDragEnd()}
-            onMouseDown={(e) => {
-              handleDragStart(e.clientX, e.clientY);
-            }}
-            onMouseMove={(e) => {
-              handleDrag(e.clientX, e.clientY);
-            }}
-            onMouseUp={() => handleDragEnd()}
-            onMouseLeave={() => handleDragEnd()}
-          >
-            <div
-              className="study-flip-inner"
-              style={{ width: '100%', height: '100%' }}
-            >
-              {/* 表 */}
-              <Card
-                className={cn(
-                  'study-flip-front relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
-                  dragState.isDragging && 'cursor-grabbing',
-                )}
-                style={{
-                  transformOrigin: 'center center',
-                  boxShadow: dragState.isDragging
-                    ? '0 10px 20px rgba(0, 0, 0, 0.15)'
-                    : '0 4px 6px rgba(0, 0, 0, 0.1)',
-                  height: '100%',
-                }}
+    <div className="min-h-screen flex flex-col">
+      <HeaderNav
+        groupMode={groupMode}
+        setGroupMode={setGroupMode}
+        scrolled={scrolled}
+      />
+      <main className="flex-1">
+        {/* ヘッダー部分 */}
+        <div className="w-full mb-4 sm:mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{currentIndex + 1}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-muted-foreground">{totalCards}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setSettingOpen(true)}
+                variant="ghost"
+                size="icon"
               >
-                {/* ドラッグ中の方向インジケーター */}
-                {dragState.isDragging && (
-                  <div
-                    className={cn(
-                      'absolute inset-0 rounded-lg transition-opacity duration-200',
-                      dragState.direction === 'left'
-                        ? 'bg-red-500/20'
-                        : dragState.direction === 'right'
-                        ? 'bg-green-500/20'
-                        : 'bg-transparent',
-                    )}
-                  />
-                )}
-                <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      speak(extractPlainText(front));
-                    }}
-                  >
-                    <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
-                  </Button>
-                </div>
-                <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
-                  <MathText text={front} />
-                </div>
-              </Card>
-              {/* 裏 */}
-              <Card
-                className={cn(
-                  'study-flip-back relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
-                  dragState.isDragging && 'cursor-grabbing',
-                )}
-                style={{
-                  transformOrigin: 'center center',
-                  boxShadow: dragState.isDragging
-                    ? '0 10px 20px rgba(0, 0, 0, 0.15)'
-                    : '0 4px 6px rgba(0, 0, 0, 0.1)',
-                  height: '100%',
-                }}
+                <Cog className="h-6 w-6" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/dashboard')}
+                className="rounded-full px-4 sm:px-6"
               >
-                <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      speak(extractPlainText(back));
-                    }}
-                  >
-                    <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
-                  </Button>
-                </div>
-                <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
-                  <MathText text={back} />
-                </div>
-              </Card>
+                終了
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRestart}
+                className="rounded-full px-4 sm:px-6"
+              >
+                再スタート
+              </Button>
             </div>
           </div>
-
-          {/* PC表示時の右ボタン */}
-          <Button
-            variant="ghost"
-            className={cn(
-              'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
-              showAnswer
-                ? 'bg-green-500 hover:bg-green-600 text-white'
-                : 'bg-blue-500 hover:bg-blue-600 text-white',
-            )}
-            onClick={showAnswer ? handleCorrect : () => setShowAnswer(true)}
-          >
-            {showAnswer ? '正解' : '答え'}
-          </Button>
+          <div className="h-2 rounded-full overflow-hidden bg-muted">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
-        {/* スマホ表示時のボタン */}
-        <div className="sm:hidden flex flex-col gap-4 mt-4">
-          <div className="grid grid-cols-2 gap-4">
+        {/* カード部分 */}
+        <style>{cardFlipStyles}</style>
+        <div className="w-full relative">
+          <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr_120px] gap-4 min-h-[400px] sm:h-[500px]">
+            {/* PC表示時の左ボタン */}
             <Button
               variant="ghost"
               className={cn(
-                'h-12 rounded-xl font-bold text-lg',
+                'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
                 showAnswer
                   ? 'bg-red-500 hover:bg-red-600 text-white'
                   : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
@@ -690,10 +553,120 @@ export default function StudyPage() {
             >
               {showAnswer ? '不正解' : '分からない'}
             </Button>
+
+            {/* カード本体 */}
+            <div
+              className={cn(
+                'relative flex-1 study-flip-card',
+                showAnswer && 'flipped',
+              )}
+              style={{ minHeight: '300px', height: '100%' }}
+              onClick={() => setShowAnswer((p) => !p)}
+              onTouchStart={(e) => {
+                const touch = e.touches[0];
+                handleDragStart(touch.clientX, touch.clientY);
+              }}
+              onTouchMove={(e) => {
+                const touch = e.touches[0];
+                handleDrag(touch.clientX, touch.clientY);
+              }}
+              onTouchEnd={() => handleDragEnd()}
+              onMouseDown={(e) => {
+                handleDragStart(e.clientX, e.clientY);
+              }}
+              onMouseMove={(e) => {
+                handleDrag(e.clientX, e.clientY);
+              }}
+              onMouseUp={() => handleDragEnd()}
+              onMouseLeave={() => handleDragEnd()}
+            >
+              <div
+                className="study-flip-inner"
+                style={{ width: '100%', height: '100%' }}
+              >
+                {/* 表 */}
+                <Card
+                  className={cn(
+                    'study-flip-front relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
+                    dragState.isDragging && 'cursor-grabbing',
+                  )}
+                  style={{
+                    transformOrigin: 'center center',
+                    boxShadow: dragState.isDragging
+                      ? '0 10px 20px rgba(0, 0, 0, 0.15)'
+                      : '0 4px 6px rgba(0, 0, 0, 0.1)',
+                    height: '100%',
+                  }}
+                >
+                  {/* ドラッグ中の方向インジケーター */}
+                  {dragState.isDragging && (
+                    <div
+                      className={cn(
+                        'absolute inset-0 rounded-lg transition-opacity duration-200',
+                        dragState.direction === 'left'
+                          ? 'bg-red-500/20'
+                          : dragState.direction === 'right'
+                          ? 'bg-green-500/20'
+                          : 'bg-transparent',
+                      )}
+                    />
+                  )}
+                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speak(extractPlainText(front));
+                      }}
+                    >
+                      <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </Button>
+                  </div>
+                  <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
+                    <MathText text={front} />
+                  </div>
+                </Card>
+                {/* 裏 */}
+                <Card
+                  className={cn(
+                    'study-flip-back relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
+                    dragState.isDragging && 'cursor-grabbing',
+                  )}
+                  style={{
+                    transformOrigin: 'center center',
+                    boxShadow: dragState.isDragging
+                      ? '0 10px 20px rgba(0, 0, 0, 0.15)'
+                      : '0 4px 6px rgba(0, 0, 0, 0.1)',
+                    height: '100%',
+                  }}
+                >
+                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speak(extractPlainText(back));
+                      }}
+                    >
+                      <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </Button>
+                  </div>
+                  <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
+                    <MathText text={back} />
+                  </div>
+                </Card>
+              </div>
+            </div>
+
+            {/* PC表示時の右ボタン */}
             <Button
               variant="ghost"
               className={cn(
-                'h-12 rounded-xl font-bold text-lg',
+                'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
                 showAnswer
                   ? 'bg-green-500 hover:bg-green-600 text-white'
                   : 'bg-blue-500 hover:bg-blue-600 text-white',
@@ -703,47 +676,77 @@ export default function StudyPage() {
               {showAnswer ? '正解' : '答え'}
             </Button>
           </div>
+
+          {/* スマホ表示時のボタン */}
+          <div className="sm:hidden flex flex-col gap-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                variant="ghost"
+                className={cn(
+                  'h-12 rounded-xl font-bold text-lg',
+                  showAnswer
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
+                )}
+                onClick={handleIncorrect}
+              >
+                {showAnswer ? '不正解' : '分からない'}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  'h-12 rounded-xl font-bold text-lg',
+                  showAnswer
+                    ? 'bg-green-500 hover:bg-green-600 text-white'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white',
+                )}
+                onClick={showAnswer ? handleCorrect : () => setShowAnswer(true)}
+              >
+                {showAnswer ? '正解' : '答え'}
+              </Button>
+            </div>
+          </div>
+
+          {/* 戻る／進むボタン */}
+          <div className="flex justify-between mt-4 sm:mt-8 px-2 sm:px-0">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-28 sm:w-32 rounded-full"
+              onClick={prev}
+              disabled={currentIndex === 0}
+            >
+              戻る
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-28 sm:w-32 rounded-full"
+              onClick={() => {
+                if (currentIndex >= totalCards - 1) {
+                  handleNext(undefined);
+                } else {
+                  next();
+                }
+              }}
+            >
+              スキップ
+            </Button>
+          </div>
         </div>
 
-        {/* 戻る／進むボタン */}
-        <div className="flex justify-between mt-4 sm:mt-8 px-2 sm:px-0">
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-28 sm:w-32 rounded-full"
-            onClick={prev}
-            disabled={currentIndex === 0}
-          >
-            戻る
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-28 sm:w-32 rounded-full"
-            onClick={() => {
-              if (currentIndex >= totalCards - 1) {
-                handleNext(undefined);
-              } else {
-                next();
-              }
-            }}
-          >
-            スキップ
-          </Button>
-        </div>
-      </div>
-
-      {/* 設定モーダル */}
-      {setting && (
-        <SettingModal
-          open={settingOpen}
-          onOpenChange={setSettingOpen}
-          value={setting}
-          stats={stats}
-          onSave={save}
-        />
-      )}
-    </DashboardShell>
+        {/* 設定モーダル */}
+        {setting && (
+          <SettingModal
+            open={settingOpen}
+            onOpenChange={setSettingOpen}
+            value={setting}
+            stats={stats}
+            onSave={save}
+          />
+        )}
+      </main>
+    </div>
   );
 }
 

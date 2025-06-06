@@ -12,20 +12,14 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Group } from '@prisma/client';
-import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
+import { DeckWithCardsAndGroups } from '@/types/deck';
 
 interface MainNavProps {
-  groups: Group[];
-  decks: DeckWithCardsAndGroups[];
-  setDecks: React.Dispatch<React.SetStateAction<DeckWithCardsAndGroups[]>>;
   groupMode: boolean;
   setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function MainNav({
-  groups = [], // デフォルトは空配列
-  decks = [], // デフォルトは空配列
-  setDecks = () => {}, // デフォルトは no-op
   groupMode = false,
   setGroupMode = () => {},
 }: MainNavProps) {

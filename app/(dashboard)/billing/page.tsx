@@ -192,9 +192,15 @@ export default function BillingPage() {
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button onClick={handleManageSubscription}>
-                サブスクリプションを管理
-              </Button>
+              {isProPlan ? (
+                <Button onClick={handleManageSubscription}>
+                  サブスクリプションを管理
+                </Button>
+              ) : (
+                <Button onClick={() => router.push('/subscription')}>
+                  アップグレード
+                </Button>
+              )}
             </CardFooter>
           </Card>
         </div>

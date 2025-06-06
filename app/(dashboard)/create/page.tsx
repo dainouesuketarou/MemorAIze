@@ -15,12 +15,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import { toast } from 'sonner';
 import { HeaderNav } from '@/components/dashboard/header-nav';
-import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
 
 export default function CreatePage() {
   const { data: session } = useSession();
   const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { limit, loading: limitLoading } = useAiGenerationLimit();
@@ -105,9 +103,6 @@ export default function CreatePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <HeaderNav
-        groups={groups}
-        decks={decks}
-        setDecks={setDecks}
         groupMode={groupMode}
         setGroupMode={setGroupMode}
         scrolled={scrolled}

@@ -18,13 +18,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Deck, Group } from '@prisma/client';
-import { DeckWithCardsAndGroups } from '@/components/dashboard/deck-list';
+import { DeckWithCardsAndGroups } from '@/types/deck';
 import { useRouter, usePathname } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { AiLimitBadge } from '@/components/dashboard/ai-limit-badge';
 import { Loading } from '../loading';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '@/lib/store/store';
+import { RootState, AppDispatch } from '@/lib/store/store';
 import {
   setDecks,
   setLoading as setDecksLoading,
@@ -41,7 +41,7 @@ interface DashboardShellProps {
   groups: Group[];
   decks: DeckWithCardsAndGroups[];
   groupMode: boolean;
-  setDecks: React.Dispatch<React.SetStateAction<DeckWithCardsAndGroups[]>>;
+  setDecks: (decks: DeckWithCardsAndGroups[]) => void;
   setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -76,7 +76,7 @@ export function DashboardShell({
   groupMode,
   setGroupMode,
 }: DashboardShellProps) {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -109,8 +109,13 @@ export function DashboardShell({
         const decksData = await decksRes.json();
 
         if (isMounted) {
-          dispatch(setDecks(decksData) as unknown as AnyAction);
-          // setDecksは親コンポーネントの状態を更新するため、ここでは呼び出さない
+          const formattedDecks = decksData.map((deck: any) => ({
+            ...deck,
+            cards: deck.cards || [],
+            lastStudied: deck.lastStudied ? String(deck.lastStudied) : null,
+            groups: deck.groups || [],
+          }));
+          dispatch(setDecks(formattedDecks) as unknown as AnyAction);
         }
 
         // グループの取得
@@ -119,7 +124,7 @@ export function DashboardShell({
         const groupsData = await groupsRes.json();
 
         if (isMounted) {
-          dispatch(setGroups(groupsData) as unknown as AnyAction);
+          dispatch(setGroups(groupsData));
         }
       } catch (error) {
         console.error('データ取得エラー:', error);
@@ -245,7 +250,9 @@ export function DashboardShell({
                         <Clock className="h-3 w-3" />
                         <span>
                           {deck.lastStudied
-                            ? `最終学習: ${getRelativeTime(deck.lastStudied)}`
+                            ? `最終学習: ${getRelativeTime(
+                                new Date(deck.lastStudied),
+                              )}`
                             : '未学習'}
                         </span>
                       </div>
@@ -279,17 +286,7 @@ export function DashboardShell({
         )}
       >
         <div className="max-w-7xl mx-auto flex h-16 items-center justify-between py-4 px-4 sm:px-6 lg:px-8 w-full">
-          <MainNav
-            groups={groups}
-            decks={decks}
-            setDecks={(newDecks) => {
-              // 親コンポーネントの状態更新とReduxの状態更新を分離
-              setDecks(newDecks);
-              dispatch(setDecks(newDecks) as unknown as AnyAction);
-            }}
-            groupMode={groupMode}
-            setGroupMode={setGroupMode}
-          />
+          <MainNav groupMode={groupMode} setGroupMode={setGroupMode} />
 
           <div className="flex-1 justify-center px-4 lg:px-8">
             {isDashboardPage && (

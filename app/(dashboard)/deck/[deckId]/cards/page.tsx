@@ -37,13 +37,14 @@ import { toast } from 'sonner';
 import { speak } from '@/lib/speech';
 import { MathRenderer } from '@/components/common/MathRenderer';
 import { MathText } from '@/components/common/MathText';
+import { setDecks } from '@/lib/store/slices/deckSlice';
 
 export default function CardsPage() {
   const router = useRouter();
   const { deckId } = useParams();
 
   const [groups, setGroups] = useState<Group[]>([]);
-  const [decks, setDecks] = useState<DeckWithCardsAndGroups[]>([]);
+  const [decks] = useState<DeckWithCardsAndGroups[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [cards, setCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

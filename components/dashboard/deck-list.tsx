@@ -40,19 +40,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import { setDecks, setLoading, setError } from '@/lib/store/slices/deckSlice';
 import { AnyAction } from '@reduxjs/toolkit';
-
-export interface DeckWithCardsAndGroups extends Deck {
-  cards: { id: string; status: string }[];
-  groups: Group[];
-  progress: number;
-  lastStudied: Date | null;
-}
+import { DeckWithCardsAndGroups } from '@/types/deck';
 
 interface DeckListProps {
   decks: DeckWithCardsAndGroups[];
   groupMode: boolean;
   groups: Group[];
-  setDecks: React.Dispatch<React.SetStateAction<DeckWithCardsAndGroups[]>>;
+  setDecks: (decks: DeckWithCardsAndGroups[]) => void;
 }
 
 export function DeckList({
@@ -163,8 +157,9 @@ export function DeckList({
   };
 
   // 日付を相対表現
-  const formatRelativeTime = (date: string | Date) => {
-    const d = typeof date === 'string' ? new Date(date) : date;
+  const formatRelativeTime = (date: string | null) => {
+    if (!date) return '';
+    const d = new Date(date);
     const diff = Date.now() - d.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     if (days === 0) return '今日';
