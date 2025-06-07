@@ -9,6 +9,7 @@ import { Subscription } from '@prisma/client';
 import { setSubscription } from '@/lib/store/slices/userSlice';
 import { useSubscription } from '@/hooks/use-subscription';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface PlanFeatures {
   name: string;
@@ -63,7 +64,7 @@ const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
 
 export const UserPlan: React.FC = () => {
   const router = useRouter();
-  const subscription = useSubscription();
+  const { subscription, isLoading } = useSubscription();
   const dispatch = useDispatch();
   const currentPlan = subscription?.plan || 'FREE';
   const planFeatures = PLAN_FEATURES[currentPlan];
@@ -92,6 +93,20 @@ export const UserPlan: React.FC = () => {
   const handlePlanChange = () => {
     router.push('/subscription');
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-card rounded-xl shadow-sm p-6 transition-all duration-300 hover:shadow-md border animate-pulse">
+        <div className="h-6 w-1/3 bg-muted rounded mb-4"></div>
+        <div className="h-4 w-1/4 bg-muted rounded mb-4"></div>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-4 w-3/4 bg-muted rounded"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-card rounded-xl shadow-sm p-6 transition-all duration-300 hover:shadow-md border">

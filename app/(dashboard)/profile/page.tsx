@@ -7,16 +7,10 @@ import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { UserInfo } from '@/components/profile/UserInfo';
 import { UserPlan } from '@/components/profile/UserPlan';
 import { Calendar } from '@/components/profile/Calendar';
-import { cn } from '@/lib/utils';
 import { HeaderNav } from '@/components/dashboard/header-nav';
-import { useSubscription } from '@/hooks/use-subscription';
-import { toast } from 'sonner';
 
 export default function ProfilePage() {
   const user = useSelector((state: RootState) => state.user);
-  const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
-  const [loginHistory, setLoginHistory] = useState<Date[]>([]);
-  const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // HeaderNav用state
@@ -39,38 +33,7 @@ export default function ProfilePage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => {
-    const fetchLoginHistory = async () => {
-      setLoading(true);
-      try {
-        const start = new Date(
-          currentMonth.getFullYear(),
-          currentMonth.getMonth(),
-          1,
-        );
-        const end = new Date(
-          currentMonth.getFullYear(),
-          currentMonth.getMonth() + 1,
-          0,
-        );
-        const res = await fetch(
-          `/api/auth/login-history?start=${start.toISOString()}&end=${end.toISOString()}`,
-        );
-        const data = await res.json();
-        setLoginHistory(
-          data.map((item: { loginAt: string }) => new Date(item.loginAt)),
-        );
-      } catch (error) {
-        console.error('Error fetching login history:', error);
-        toast.error('ログイン履歴の取得に失敗しました');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLoginHistory();
-  }, [currentMonth]);
-
-  if (!user || !user.email || isSubscriptionLoading) return null;
+  if (!user || !user.email) return null;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -101,10 +64,8 @@ export default function ProfilePage() {
                   下記カレンダーであなたの学習継続状況を確認できます。
                 </p>
                 <Calendar
-                  loginDates={loginHistory}
                   currentMonth={currentMonth}
                   setCurrentMonth={setCurrentMonth}
-                  loading={loading}
                 />
               </div>
             </div>

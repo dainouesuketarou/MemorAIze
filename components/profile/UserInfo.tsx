@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Mail, Edit2, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@radix-ui/react-avatar';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/lib/store/store';
+import { setUser } from '@/lib/store/slices/userSlice';
+import { toast } from 'sonner';
 
 interface UserInfoProps {
   username: string;
@@ -13,17 +15,42 @@ interface UserInfoProps {
 export const UserInfo: React.FC<UserInfoProps> = ({ username, email }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(username);
+  const [loading, setLoading] = useState(false);
   const user = useSelector((state: RootState) => state.user);
+  const dispatch = useDispatch();
 
   const handleEdit = () => setIsEditing(true);
   const handleCancel = () => {
     setEditName(username);
     setIsEditing(false);
   };
-  const handleSave = () => {
-    // ここでAPIやReduxでユーザー名を更新する処理を追加（現状はモック）
-    // 例: dispatch(setUser({ name: editName }))
-    setIsEditing(false);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/user/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: editName }),
+      });
+
+      if (!response.ok) {
+        throw new Error('ユーザー名の更新に失敗しました');
+      }
+
+      const updatedUser = await response.json();
+      dispatch(setUser(updatedUser));
+      toast.success('ユーザー名を更新しました');
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating username:', error);
+      toast.error('ユーザー名の更新に失敗しました');
+      setEditName(username);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -43,7 +70,6 @@ export const UserInfo: React.FC<UserInfoProps> = ({ username, email }) => {
       <div className="space-y-4">
         <div className="flex items-center">
           <div className="w-10 h-10 flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            {/* ユーザーの丸い形のアイコン */}
             <Avatar className="h-8 w-8 rounded-full">
               <AvatarImage
                 src={user?.image || '/profile.png'}
@@ -63,18 +89,21 @@ export const UserInfo: React.FC<UserInfoProps> = ({ username, email }) => {
                   className="border rounded px-2 py-1 text-foreground bg-background w-full focus:outline-none focus:ring-2 focus:ring-primary/20"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
+                  disabled={loading}
                   autoFocus
                 />
                 <button
-                  className="p-1 text-green-600 hover:bg-green-500/10 rounded transition-colors"
+                  className="p-1 text-green-600 hover:bg-green-500/10 rounded transition-colors disabled:opacity-50"
                   onClick={handleSave}
+                  disabled={loading}
                   aria-label="保存"
                 >
                   <Check size={18} />
                 </button>
                 <button
-                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors disabled:opacity-50"
                   onClick={handleCancel}
+                  disabled={loading}
                   aria-label="キャンセル"
                 >
                   <X size={18} />

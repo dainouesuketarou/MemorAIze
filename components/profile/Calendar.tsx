@@ -1,45 +1,51 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CalendarDay } from './CalendarDay';
+import { toast } from 'sonner';
 
 interface CalendarProps {
-  loginDates: Date[];
   currentMonth: Date;
   setCurrentMonth: (date: Date) => void;
-  loading: boolean;
 }
 
 export const Calendar: React.FC<CalendarProps> = ({
-  loginDates,
   currentMonth,
   setCurrentMonth,
-  loading,
 }) => {
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
-  const [loginHistory, setLoginHistory] = useState<Date[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
+  const [loginDates, setLoginDates] = useState<Date[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchLoginHistory = async () => {
-      setLoadingHistory(true);
-      const start = new Date(
-        currentMonth.getFullYear(),
-        currentMonth.getMonth(),
-        1,
-      );
-      const end = new Date(
-        currentMonth.getFullYear(),
-        currentMonth.getMonth() + 1,
-        0,
-      );
-      const res = await fetch(
-        `/api/auth/login-history?start=${start.toISOString()}&end=${end.toISOString()}`,
-      );
-      const data = await res.json();
-      setLoginHistory(
-        data.map((item: { loginAt: string }) => new Date(item.loginAt)),
-      );
-      setLoadingHistory(false);
+      setLoading(true);
+      try {
+        const start = new Date(
+          currentMonth.getFullYear(),
+          currentMonth.getMonth(),
+          1,
+        );
+        const end = new Date(
+          currentMonth.getFullYear(),
+          currentMonth.getMonth() + 1,
+          0,
+        );
+        const res = await fetch(
+          `/api/auth/login-history?start=${start.toISOString()}&end=${end.toISOString()}`,
+        );
+        if (!res.ok) {
+          throw new Error('ログイン履歴の取得に失敗しました');
+        }
+        const data = await res.json();
+        setLoginDates(
+          data.map((item: { loginAt: string }) => new Date(item.loginAt)),
+        );
+      } catch (error) {
+        console.error('Error fetching login history:', error);
+        toast.error('ログイン履歴の取得に失敗しました');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchLoginHistory();
   }, [currentMonth]);
@@ -74,11 +80,13 @@ export const Calendar: React.FC<CalendarProps> = ({
       new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1),
     );
   };
+
   const goToNextMonth = () => {
     setCurrentMonth(
       new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1),
     );
   };
+
   const hasLoginActivity = (date: Date) => {
     return loginDates.some(
       (loginDate) =>
@@ -87,26 +95,29 @@ export const Calendar: React.FC<CalendarProps> = ({
         loginDate.getFullYear() === date.getFullYear(),
     );
   };
+
   const formatMonthYear = (date: Date) => {
     return `${date.getFullYear()}年${date.getMonth() + 1}月`;
   };
+
   const daysOfWeek = ['日', '月', '火', '水', '木', '金', '土'];
+
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={goToPreviousMonth}
-          className="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition-colors duration-200"
+          className="p-2 rounded-full text-muted-foreground hover:bg-accent/5 transition-colors duration-200"
           aria-label="前の月"
         >
           <ChevronLeft size={20} />
         </button>
-        <h3 className="text-lg font-medium text-gray-800">
+        <h3 className="text-lg font-medium text-foreground">
           {formatMonthYear(currentMonth)}
         </h3>
         <button
           onClick={goToNextMonth}
-          className="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition-colors duration-200"
+          className="p-2 rounded-full text-muted-foreground hover:bg-accent/5 transition-colors duration-200"
           aria-label="次の月"
         >
           <ChevronRight size={20} />
@@ -116,7 +127,7 @@ export const Calendar: React.FC<CalendarProps> = ({
         {daysOfWeek.map((day) => (
           <div
             key={day}
-            className="text-xs md:text-sm text-gray-500 font-medium text-center py-2"
+            className="text-xs md:text-sm text-muted-foreground font-medium text-center py-2"
           >
             {day}
           </div>
@@ -124,7 +135,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       </div>
       <div className="grid grid-cols-7 gap-1 md:gap-2">
         {loading ? (
-          <div className="col-span-7 text-center text-gray-400 py-8">
+          <div className="col-span-7 text-center text-muted-foreground py-8">
             読み込み中...
           </div>
         ) : (
@@ -139,8 +150,8 @@ export const Calendar: React.FC<CalendarProps> = ({
         )}
       </div>
       <div className="flex justify-end items-center mt-6">
-        <div className="flex items-center space-x-2 ml-4 text-sm text-gray-500">
-          <div className="w-3 h-3 rounded-sm bg-blue-500"></div>
+        <div className="flex items-center space-x-2 ml-4 text-sm text-muted-foreground">
+          <div className="w-3 h-3 rounded-sm bg-primary"></div>
           <span>ログイン日</span>
         </div>
       </div>
