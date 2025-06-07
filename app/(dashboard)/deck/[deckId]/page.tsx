@@ -161,23 +161,44 @@ export default function DeckDetailsPage() {
   const pieUnlearnedPercentage =
     totalCards > 0 ? Math.round((unlearnedCount / totalCards) * 100) : 0;
 
-  const pieData = [
-    {
-      name: '覚えた',
-      value: masteredCount,
-      color: '#4ade80',
-    },
-    {
-      name: '苦手',
-      value: strugglingCount,
-      color: '#f87171',
-    },
-    {
-      name: '未学習',
-      value: unlearnedCount,
-      color: '#9ca3af',
-    },
-  ];
+  // 学習済みモードの場合の進捗計算
+  const learnedTotal = masteredCount + strugglingCount;
+  const learnedMasteredPercentage =
+    learnedTotal > 0 ? Math.round((masteredCount / learnedTotal) * 100) : 0;
+  const learnedStrugglingPercentage =
+    learnedTotal > 0 ? Math.round((strugglingCount / learnedTotal) * 100) : 0;
+
+  const pieData =
+    pieProgressMode === 'all'
+      ? [
+          {
+            name: '覚えた',
+            value: masteredCount,
+            color: '#4ade80',
+          },
+          {
+            name: '苦手',
+            value: strugglingCount,
+            color: '#f87171',
+          },
+          {
+            name: '未学習',
+            value: unlearnedCount,
+            color: '#9ca3af',
+          },
+        ]
+      : [
+          {
+            name: '覚えた',
+            value: masteredCount,
+            color: '#4ade80',
+          },
+          {
+            name: '苦手',
+            value: strugglingCount,
+            color: '#f87171',
+          },
+        ];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -268,7 +289,9 @@ export default function DeckDetailsPage() {
                       <span>覚えた</span>
                     </div>
                     <span className="font-bold text-[#4ade80]">
-                      {pieMasteredPercentage}%
+                      {pieProgressMode === 'all'
+                        ? `${pieMasteredPercentage}%`
+                        : `${learnedMasteredPercentage}%`}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-base">
@@ -277,7 +300,9 @@ export default function DeckDetailsPage() {
                       <span>苦手</span>
                     </div>
                     <span className="font-bold text-[#f87171]">
-                      {pieStrugglingPercentage}%
+                      {pieProgressMode === 'all'
+                        ? `${pieStrugglingPercentage}%`
+                        : `${learnedStrugglingPercentage}%`}
                     </span>
                   </div>
                   {pieProgressMode === 'all' && (

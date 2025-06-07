@@ -1,12 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { LoaderCircle } from 'lucide-react';
 import { Group } from '@prisma/client';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useDispatch } from 'react-redux';
+import { addCard } from '@/lib/store/slices/deckSlice';
 
 interface Props {
   deckId: string | string[];
@@ -14,26 +14,16 @@ interface Props {
   onSuccess: () => void;
 }
 
-export function CardAddManualForm({ deckId, groups, onSuccess }: Props) {
+export function CardAddManualForm({ deckId, onSuccess }: Props) {
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (groups.length > 0) {
-      setSelectedGroupIds([groups[0].id]);
-    }
-  }, [groups]);
+  const dispatch = useDispatch();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!front || !back) {
       toast.error('表面と裏面を入力してください');
-      return;
-    }
-    if (selectedGroupIds.length === 0) {
-      toast.error('少なくとも1つの分野を選択してください');
       return;
     }
 
@@ -46,7 +36,6 @@ export function CardAddManualForm({ deckId, groups, onSuccess }: Props) {
           deckId,
           front,
           back,
-          groupIds: selectedGroupIds,
         }),
       });
 
@@ -54,6 +43,23 @@ export function CardAddManualForm({ deckId, groups, onSuccess }: Props) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'カードの追加に失敗しました');
       }
+
+      const data = await res.json();
+
+      // Reduxの状態を更新
+      dispatch(
+        addCard({
+          deckId: deckId as string,
+          card: {
+            id: data.id,
+            front: data.front,
+            back: data.back,
+            status: 'UNLEARNED',
+            order: data.order,
+            favorite: false,
+          },
+        }),
+      );
 
       setIsLoading(false);
       setFront('');
@@ -95,49 +101,6 @@ export function CardAddManualForm({ deckId, groups, onSuccess }: Props) {
         <p className="text-sm text-muted-foreground mt-1">
           100文字以内で入力してください
         </p>
-      </div>
-
-      {/* グループ選択 */}
-      <div className="space-y-4">
-        <label className="block font-medium">分野（複数選択可）</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {groups.map((group) => (
-            <label
-              key={group.id}
-              className={cn(
-                'relative flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200',
-                selectedGroupIds.includes(group.id)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/20 hover:border-primary/50',
-              )}
-            >
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={selectedGroupIds.includes(group.id)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedGroupIds((prev) => [...prev, group.id]);
-                  } else {
-                    setSelectedGroupIds((prev) =>
-                      prev.filter((id) => id !== group.id),
-                    );
-                  }
-                }}
-              />
-              <span
-                className={cn(
-                  'text-sm font-medium',
-                  selectedGroupIds.includes(group.id)
-                    ? 'text-primary'
-                    : 'text-muted-foreground',
-                )}
-              >
-                {group.name}
-              </span>
-            </label>
-          ))}
-        </div>
       </div>
 
       <Button

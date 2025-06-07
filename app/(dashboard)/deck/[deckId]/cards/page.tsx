@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogClose,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CardAddAiForm } from '@/components/cards/card-add-ai-form';
@@ -57,6 +58,8 @@ export default function CardsPage() {
   const [editingCard, setEditingCard] = useState<any>(null);
   const [deckEditModalOpen, setDeckEditModalOpen] = useState(false);
   const [currentDeck, setCurrentDeck] = useState<any>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [cardToDelete, setCardToDelete] = useState<any>(null);
 
   useEffect(() => {
     fetch('/api/groups')
@@ -111,7 +114,6 @@ export default function CardsPage() {
   };
 
   const handleCardDelete = async (cardId: string) => {
-    if (!confirm('このカードを削除してもよろしいですか？')) return;
     try {
       const response = await fetch(`/api/cards/${cardId}`, {
         method: 'DELETE',
@@ -127,9 +129,15 @@ export default function CardsPage() {
 
       toast.success('カードを削除しました');
       handleCardAddSuccess();
+      setDeleteModalOpen(false);
     } catch {
       toast.error('エラーが発生しました');
     }
+  };
+
+  const handleDeleteClick = (card: any) => {
+    setCardToDelete(card);
+    setDeleteModalOpen(true);
   };
 
   const handleCardEdit = (card: any) => {
@@ -202,7 +210,7 @@ export default function CardsPage() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 hover:bg-destructive/10"
-                      onClick={() => handleCardDelete(card.id)}
+                      onClick={() => handleDeleteClick(card)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -322,6 +330,29 @@ export default function CardsPage() {
               閉じる
             </Button>
           </DialogClose>
+        </DialogContent>
+      </Dialog>
+
+      {/* カード削除確認モーダル */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>カードの削除</DialogTitle>
+            <DialogDescription>
+              このカードを削除してもよろしいですか？ この操作は取り消せません。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+              キャンセル
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => cardToDelete && handleCardDelete(cardToDelete.id)}
+            >
+              削除
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

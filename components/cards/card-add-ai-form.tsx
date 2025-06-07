@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { Group } from '@prisma/client';
 import { useDispatch } from 'react-redux';
 import { updateUsage } from '@/lib/store/slices/aiGenerationLimitSlice';
+import { addCards } from '@/lib/store/slices/deckSlice';
 
 const formSchema = z.object({
   content: z
@@ -122,14 +123,6 @@ export function CardAddAiForm({ deckId, groups, onSuccess }: Props) {
 
   const handleSave = async () => {
     if (!generated) return;
-    if (selectedGroupIds.length === 0) {
-      toast({
-        title: 'エラー',
-        description: '少なくとも1つの分野を選択してください',
-        variant: 'destructive',
-      });
-      return;
-    }
     setIsLoading(true);
     try {
       const res = await fetch('/api/cards/save', {
@@ -138,11 +131,26 @@ export function CardAddAiForm({ deckId, groups, onSuccess }: Props) {
         body: JSON.stringify({
           deckId,
           cards: generated.cards,
-          groupIds: selectedGroupIds,
         }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error);
+
+      // Reduxの状態を更新
+      dispatch(
+        addCards({
+          deckId: deckId as string,
+          cards: json.data.cards.map((card: any) => ({
+            id: card.id,
+            front: card.front,
+            back: card.back,
+            status: 'UNLEARNED',
+            order: card.order,
+            favorite: false,
+          })),
+        }),
+      );
+
       toast({
         title: 'カードが追加されました',
         description: 'AIによって生成されたカードがデッキに追加されました。',
@@ -458,49 +466,6 @@ export function CardAddAiForm({ deckId, groups, onSuccess }: Props) {
               </FormItem>
             )}
           />
-
-          {/* グループ選択 */}
-          <div className="space-y-4">
-            <FormLabel className="text-base">分野（複数選択可）</FormLabel>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {groups.map((group) => (
-                <label
-                  key={group.id}
-                  className={cn(
-                    'relative flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200',
-                    selectedGroupIds.includes(group.id)
-                      ? 'border-primary bg-primary/5'
-                      : 'border-muted-foreground/20 hover:border-primary/50',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={selectedGroupIds.includes(group.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedGroupIds((prev) => [...prev, group.id]);
-                      } else {
-                        setSelectedGroupIds((prev) =>
-                          prev.filter((id) => id !== group.id),
-                        );
-                      }
-                    }}
-                  />
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      selectedGroupIds.includes(group.id)
-                        ? 'text-primary'
-                        : 'text-muted-foreground',
-                    )}
-                  >
-                    {group.name}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
 
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
