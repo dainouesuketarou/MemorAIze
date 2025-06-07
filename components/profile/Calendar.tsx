@@ -3,7 +3,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CalendarDay } from './CalendarDay';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
-import { setLoginHistory } from '@/lib/store/slices/loginHistorySlice';
+import {
+  setLoginHistory,
+  setLoading,
+  setError,
+} from '@/lib/store/slices/loginHistorySlice';
 
 interface CalendarProps {
   currentMonth: Date;
@@ -24,6 +28,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   useEffect(() => {
     const fetchLoginHistory = async () => {
       try {
+        dispatch(setLoading(true));
         const start = new Date(
           currentMonth.getFullYear(),
           currentMonth.getMonth(),
@@ -48,6 +53,13 @@ export const Calendar: React.FC<CalendarProps> = ({
         dispatch(setLoginHistory(data));
       } catch (error) {
         console.error('Error fetching login history:', error);
+        dispatch(
+          setError(
+            error instanceof Error
+              ? error.message
+              : 'ログイン履歴の取得に失敗しました',
+          ),
+        );
       }
     };
     fetchLoginHistory();
