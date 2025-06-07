@@ -1,31 +1,48 @@
-import { useState, useEffect, useCallback } from 'react';
-
-interface AiGenerationLimit {
-  count: number;
-  limit: number;
-}
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import {
+  setLimit,
+  setLoading,
+  setError,
+} from '@/lib/store/slices/aiGenerationLimitSlice';
+import { AiGenerationLimit } from '@/types/ai-generation-limit';
 
 export function useAiGenerationLimit() {
-  const [limit, setLimit] = useState<AiGenerationLimit | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchLimit = useCallback(async () => {
-    try {
-      const response = await fetch('/api/ai-generation-limit');
-      const data = await response.json();
-      if (data.success) {
-        setLimit(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching AI generation limit:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const dispatch = useDispatch();
+  const { limit, isLoading, error } = useSelector(
+    (state: RootState) => state.aiGenerationLimit,
+  );
 
   useEffect(() => {
-    fetchLimit();
-  }, [fetchLimit]);
+    const fetchLimit = async () => {
+      try {
+        dispatch(setLoading(true));
+        const response = await fetch('/api/ai-generation-limit');
+        const data = await response.json();
 
-  return { limit, loading, refreshLimit: fetchLimit };
+        if (data.success) {
+          const limitData: AiGenerationLimit = {
+            id: data.data.id,
+            userId: data.data.userId,
+            monthlyLimit: data.data.limit,
+            monthlyUsage: data.data.count,
+            lastResetMonth: new Date(data.data.resetAt),
+          };
+          dispatch(setLimit(limitData));
+        } else {
+          dispatch(setError(data.error || 'AI生成制限の取得に失敗しました'));
+        }
+      } catch (error) {
+        console.error('Error fetching AI generation limit:', error);
+        dispatch(setError('AI生成制限の取得に失敗しました'));
+      } finally {
+        dispatch(setLoading(false));
+      }
+    };
+
+    fetchLimit();
+  }, [dispatch]);
+
+  return { limit, isLoading, error };
 }

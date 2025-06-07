@@ -14,6 +14,7 @@ import { Button } from '../ui/button';
 import Link from 'next/link';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useEffect } from 'react';
+import { AiGenerationLimitResponse } from '@/types/ai-generation-limit';
 
 /**
  * ヘッダー用のコンパクト表示
@@ -40,8 +41,11 @@ export function AiLimitBadge({
       try {
         const res = await fetch(`/api/ai-generation-limit?userId=${userId}`);
         if (!res.ok) throw new Error('AI生成制限の取得に失敗しました');
-        const data = await res.json();
-        dispatch(setLimit(data));
+        const data: AiGenerationLimitResponse = await res.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        dispatch(setLimit(data.limit));
       } catch (error) {
         console.error('AI生成制限取得エラー:', error);
         dispatch(setError('AI生成制限の取得に失敗しました'));
@@ -77,7 +81,7 @@ export function AiLimitBadge({
 
   if (!limit) return null;
 
-  const isNearLimit = limit.dailyUsage >= limit.dailyLimit * 0.8; // 80%以上使用で警告表示
+  const isNearLimit = limit.monthlyUsage >= limit.monthlyLimit * 0.8; // 80%以上使用で警告表示
 
   return (
     <Card className="mb-4">
@@ -109,7 +113,8 @@ export function AiLimitBadge({
                 />
                 <div>
                   <p className="text-sm font-medium">
-                    今日のAI生成回数: {limit.dailyUsage}/{limit.dailyLimit}回
+                    今月のAI生成回数: {limit.monthlyUsage || 0}/
+                    {limit.monthlyLimit || 0}回
                   </p>
                   <p
                     className={cn(
@@ -117,7 +122,8 @@ export function AiLimitBadge({
                       isNearLimit ? 'text-red-500' : 'text-muted-foreground',
                     )}
                   >
-                    残り{limit.dailyLimit - limit.dailyUsage}回生成できます
+                    残り{(limit.monthlyLimit || 0) - (limit.monthlyUsage || 0)}
+                    回生成できます
                   </p>
                 </div>
               </div>

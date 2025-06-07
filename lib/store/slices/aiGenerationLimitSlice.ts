@@ -1,21 +1,9 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-
-export interface AiGenerationLimit {
-  id: string;
-  userId: string;
-  dailyLimit: number;
-  monthlyLimit: number;
-  dailyUsage: number;
-  monthlyUsage: number;
-  lastResetDate: Date;
-  lastResetMonth: Date;
-}
-
-interface AiGenerationLimitState {
-  limit: AiGenerationLimit | null;
-  isLoading: boolean;
-  error: string | null;
-}
+import {
+  AiGenerationLimit,
+  AiGenerationLimitState,
+  UpdateAiGenerationLimitParams,
+} from '@/types/ai-generation-limit';
 
 const initialState: AiGenerationLimitState = {
   limit: null,
@@ -34,17 +22,12 @@ const aiGenerationLimitSlice = createSlice({
     },
     updateUsage: (
       state,
-      action: PayloadAction<{ dailyUsage: number; monthlyUsage: number }>,
+      action: PayloadAction<UpdateAiGenerationLimitParams>,
     ) => {
       if (state.limit) {
-        state.limit.dailyUsage = action.payload.dailyUsage;
+        console.log('updateUsage', action.payload);
+        console.log('state.limit', state.limit);
         state.limit.monthlyUsage = action.payload.monthlyUsage;
-      }
-    },
-    resetDailyLimit: (state) => {
-      if (state.limit) {
-        state.limit.dailyUsage = 0;
-        state.limit.lastResetDate = new Date();
       }
     },
     resetMonthlyLimit: (state) => {
@@ -66,7 +49,6 @@ const aiGenerationLimitSlice = createSlice({
 export const {
   setLimit,
   updateUsage,
-  resetDailyLimit,
   resetMonthlyLimit,
   setLoading,
   setError,
