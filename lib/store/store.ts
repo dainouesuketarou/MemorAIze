@@ -4,6 +4,7 @@ import deckReducer from './slices/deckSlice';
 import groupReducer from './slices/groupSlice';
 import aiGenerationLimitReducer from './slices/aiGenerationLimitSlice';
 import studyProgressReducer from './slices/studyProgressSlice';
+import studyReducer from './slices/studySlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     group: groupReducer,
     aiGenerationLimit: aiGenerationLimitReducer,
     studyProgress: studyProgressReducer,
+    study: studyReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

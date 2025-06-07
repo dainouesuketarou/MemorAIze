@@ -22,8 +22,9 @@ import {
   setError,
   setFilter,
   setSort,
+  fetchDecksIfNeeded,
 } from '@/lib/store/slices/deckSlice';
-import { setGroups } from '@/lib/store/slices/groupSlice';
+import { setGroups, fetchGroupsIfNeeded } from '@/lib/store/slices/groupSlice';
 import { AnyAction } from '@reduxjs/toolkit';
 
 export default function DashboardPage() {
@@ -34,8 +35,9 @@ export default function DashboardPage() {
     isLoading: decksLoading,
     filter: reduxFilter,
     sort: reduxSort,
+    lastFetched: decksLastFetched,
   } = useSelector((state: RootState) => state.deck);
-  const { groups: reduxGroups } = useSelector(
+  const { groups: reduxGroups, lastFetched: groupsLastFetched } = useSelector(
     (state: RootState) => state.group,
   );
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
@@ -46,42 +48,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const fetchData = async () => {
-      dispatch(setLoading(true));
-      try {
-        // デッキの取得
-        const decksRes = await fetch('/api/decks');
-        if (!decksRes.ok) throw new Error('デッキ一覧の取得に失敗しました');
-        const decksData = await decksRes.json();
-        const formattedDecks = decksData.map((deck: any) => ({
-          ...deck,
-          cards: deck.cards || [],
-          lastStudied: deck.lastStudied ? String(deck.lastStudied) : null,
-          groups: deck.groups || [],
-        }));
-        dispatch(setDecks(formattedDecks));
-
-        // グループの取得
-        const groupsRes = await fetch(`/api/groups?userId=${session.user.id}`);
-        if (!groupsRes.ok) throw new Error('グループ一覧の取得に失敗しました');
-        const groupsData = await groupsRes.json();
-        dispatch(setGroups(groupsData));
-      } catch (error) {
-        console.error('データ取得エラー:', error);
-        dispatch(
-          setError(
-            error instanceof Error
-              ? error.message
-              : 'データの取得に失敗しました',
-          ),
-        );
-        toast.error('データの取得に失敗しました');
-      } finally {
-        dispatch(setLoading(false));
-      }
-    };
-
-    fetchData();
+    // デッキとグループのデータを必要に応じてフェッチ
+    dispatch(fetchDecksIfNeeded() as unknown as AnyAction);
+    dispatch(fetchGroupsIfNeeded() as unknown as AnyAction);
   }, [session?.user?.id, dispatch]);
 
   // フィルタリングとソートの適用

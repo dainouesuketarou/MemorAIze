@@ -29,14 +29,14 @@ export function DeckEditForm({
 
     try {
       const res = await fetch(`/api/decks/${deckId}`, {
-        method : 'PATCH',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body   : JSON.stringify({ title, description }),
+        body: JSON.stringify({ title, description }),
       });
 
       if (!res.ok) throw new Error('更新失敗');
       toast.success('デッキを更新しました');
-      onSuccess();                 // 親へ通知
+      onSuccess(); // 親へ通知
     } catch {
       toast.error('エラーが発生しました');
     } finally {

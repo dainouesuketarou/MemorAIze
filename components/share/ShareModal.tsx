@@ -124,24 +124,26 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl flex flex-col md:flex-row p-2 sm:p-6 relative mx-2 sm:mx-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="bg-background border rounded-xl shadow-lg w-full max-w-4xl flex flex-col md:flex-row p-2 sm:p-6 relative mx-2 sm:mx-0">
         <button
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 text-muted-foreground hover:text-foreground transition-colors"
           onClick={onClose}
           aria-label="閉じる"
         >
           ×
         </button>
         {/* 左：自分のDeckリスト */}
-        <div className="w-full md:w-1/2 md:pr-4 border-b md:border-b-0 md:border-r border-gray-100 overflow-y-auto max-h-[60vh] md:max-h-[70vh] pb-4 md:pb-0">
-          <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4">
+        <div className="w-full md:w-1/2 md:pr-4 border-b md:border-b-0 md:border-r border-border overflow-y-auto max-h-[60vh] md:max-h-[70vh] pb-4 md:pb-0">
+          <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4 text-foreground">
             自分の暗記帳一覧
           </h2>
           {loading ? (
-            <div className="text-gray-400 py-8 text-center">読み込み中...</div>
+            <div className="text-muted-foreground py-8 text-center">
+              読み込み中...
+            </div>
           ) : myDecks.length === 0 ? (
-            <div className="text-gray-400 py-8 text-center">
+            <div className="text-muted-foreground py-8 text-center">
               暗記帳がありません
             </div>
           ) : (
@@ -163,12 +165,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
         {/* 右：ID入力バー＋importボタン＋import済みDeckリスト */}
         <div className="w-full md:w-1/2 md:pl-4 flex flex-col mt-4 md:mt-0">
           <div className="mb-4 sm:mb-6">
-            <h2 className="text-base sm:text-lg font-semibold mb-2">
+            <h2 className="text-base sm:text-lg font-semibold mb-2 text-foreground">
               暗記帳をインポート
             </h2>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
-                className="border rounded px-3 py-2 flex-1 min-w-0"
+                className="border border-input rounded-md px-3 py-2 flex-1 min-w-0 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="共有IDを入力"
                 value={importCode}
                 onChange={(e) => setImportCode(e.target.value)}
@@ -178,6 +180,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/subscription')}
+                  className="gap-2"
                 >
                   <Sparkles className="h-4 w-4" />
                   <span>アップグレードしてインポート</span>
@@ -188,9 +191,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <h3 className="text-md font-semibold mb-2">インポート済み暗記帳</h3>
+            <h3 className="text-md font-semibold mb-2 text-foreground">
+              インポート済み暗記帳
+            </h3>
             {importedDecks.length === 0 ? (
-              <div className="text-gray-400 py-8 text-center">
+              <div className="text-muted-foreground py-8 text-center">
                 まだインポートしていません
               </div>
             ) : (
@@ -205,7 +210,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
                   onClick={() => router.push(`/dashboard/deck/${deck.id}`)}
                 >
                   <button
-                    className="ml-auto mt-2 flex items-center text-red-500 hover:text-red-700 text-xs px-2 py-1 border border-red-200 rounded"
+                    className="ml-auto mt-2 flex items-center text-destructive hover:text-destructive/90 text-xs px-2 py-1 border border-destructive/20 rounded-md transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteImported(deck.id);

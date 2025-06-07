@@ -18,6 +18,7 @@ interface UserState {
   subscription: Subscription | null;
   isLoading: boolean;
   error: string | null;
+  lastFetched: number | null;
 }
 
 const initialState: UserState = {
@@ -29,6 +30,7 @@ const initialState: UserState = {
   subscription: null,
   isLoading: true,
   error: null,
+  lastFetched: null,
 };
 
 const userSlice = createSlice({
@@ -47,6 +49,7 @@ const userSlice = createSlice({
       state.subscription = action.payload;
       state.isLoading = false;
       state.error = null;
+      state.lastFetched = Date.now();
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;

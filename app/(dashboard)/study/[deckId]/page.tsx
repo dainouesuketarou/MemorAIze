@@ -12,7 +12,7 @@ import { SettingModal } from '@/components/study/SettingModal';
 import { useDeckSetting } from '@/hooks/useDeckSetting';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '@/lib/store/store';
+import { RootState, AppDispatch } from '@/lib/store/store';
 import {
   saveProgress,
   clearProgress,
@@ -22,6 +22,11 @@ import { AnyAction } from '@reduxjs/toolkit';
 import { MathRenderer } from '@/components/common/MathRenderer';
 import { MathText } from '@/components/common/MathText';
 import { HeaderNav } from '@/components/dashboard/header-nav';
+import {
+  fetchDeckCardsIfNeeded,
+  updateCardStatus,
+  toggleFavorite,
+} from '@/lib/store/slices/studySlice';
 
 /* ------------ 型 ------------ */
 type CardType = {
@@ -50,7 +55,7 @@ type TouchPosition = {
 export default function StudyPage() {
   const { deckId } = useParams();
   const router = useRouter();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const studyProgress = useSelector(
     (state: RootState) => state.studyProgress.progress[deckId as string],
   );
@@ -60,11 +65,12 @@ export default function StudyPage() {
   const [scrolled, setScrolled] = useState(false);
 
   /* ---------- カード ---------- */
-  const [rawCards, setRawCards] = useState<CardType[]>([]);
+  const {
+    cards: reduxCards,
+    isLoading,
+    stats: reduxStats,
+  } = useSelector((state: RootState) => state.study);
   const [cards, setCards] = useState<CardType[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  /* ---------- 学習フロー ---------- */
   const [currentIndex, setCurrentIndex] = useState(
     studyProgress?.currentIndex ?? 0,
   );
@@ -118,27 +124,14 @@ export default function StudyPage() {
 
   /* ============ デッキ取得 ============ */
   useEffect(() => {
-    if (!deckId) return;
-    setLoading(true);
-    fetch(`/api/decks/${deckId}`)
-      .then((r) => r.json())
-      .then((deck) => {
-        const all: CardType[] = deck.cards ?? [];
-        setRawCards(all);
-        setStats({
-          UNLEARNED: all.filter((c) => c.status === 'UNLEARNED').length,
-          MASTERED: all.filter((c) => c.status === 'MASTERED').length,
-          STRUGGLING: all.filter((c) => c.status === 'STRUGGLING').length,
-          FAVORITE: all.filter((c) => c.favorite).length,
-        });
-      })
-      .finally(() => setLoading(false));
-  }, [deckId]);
+    if (!deckId || Array.isArray(deckId)) return;
+    dispatch(fetchDeckCardsIfNeeded(deckId));
+  }, [deckId, dispatch]);
 
   /* ============ 設定反映 ============ */
   useEffect(() => {
-    if (!setting) return;
-    let list = [...rawCards];
+    if (!setting || !reduxCards.length) return;
+    let list = [...reduxCards];
 
     if (setting.filterMode.length) {
       const sel = new Set(setting.filterMode);
@@ -176,7 +169,7 @@ export default function StudyPage() {
       setShowAnswer(false);
     }
     prevSettingRef.current = setting;
-  }, [setting, rawCards]);
+  }, [setting, reduxCards, save]);
 
   /* ============ 音声読み上げの初期化 ============ */
   useEffect(() => {
@@ -224,13 +217,11 @@ export default function StudyPage() {
 
   /* ====== 正解/不正解/学習完了（元実装を保持） ====== */
   const handleCorrect = () => {
-    // 最後のカードで既に遷移中なら重複防止
     if (currentIndex >= totalCards - 1 && isTransitioning) return;
 
-    setStudyResults((prev) => [
-      ...prev,
-      { id: currentCard.id, mastered: true },
-    ]);
+    const cardId = currentCard.id;
+    dispatch(updateCardStatus({ cardId, status: 'MASTERED' }));
+    setStudyResults((prev) => [...prev, { id: cardId, mastered: true }]);
     setMasteredCount((p) => Math.min(p + 1, totalCards));
 
     if (currentIndex < totalCards - 1) {
@@ -243,10 +234,9 @@ export default function StudyPage() {
   const handleIncorrect = () => {
     if (currentIndex >= totalCards - 1 && isTransitioning) return;
 
-    setStudyResults((prev) => [
-      ...prev,
-      { id: currentCard.id, mastered: false },
-    ]);
+    const cardId = currentCard.id;
+    dispatch(updateCardStatus({ cardId, status: 'STRUGGLING' }));
+    setStudyResults((prev) => [...prev, { id: cardId, mastered: false }]);
     setMasteredCount((p) => Math.max(p - 1, 0));
 
     if (currentIndex < totalCards - 1) {
@@ -453,7 +443,7 @@ export default function StudyPage() {
   };
 
   /* ============ ローディング / 0枚 ============ */
-  if (loading || isTransitioning)
+  if (isLoading || isTransitioning)
     return (
       <div className="min-h-screen flex flex-col">
         <HeaderNav

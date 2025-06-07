@@ -2,6 +2,7 @@ import {
   createSlice,
   PayloadAction,
   ActionCreatorWithPayload,
+  createAsyncThunk,
 } from '@reduxjs/toolkit';
 import { Group } from '@prisma/client';
 import { DeckWithCardsAndGroups } from '@/types/deck';
@@ -22,16 +23,86 @@ interface DeckState {
   filter: 'all' | 'inProgress' | 'completed' | 'notStarted';
   sort: 'recent' | 'alphabetical' | 'cardCount';
   selectedDeck: DeckWithCardsAndGroups | null;
+  lastFetched: number | null;
 }
 
 const initialState: DeckState = {
   decks: [],
-  isLoading: true,
+  isLoading: false,
   error: null,
   filter: 'all',
   sort: 'recent',
   selectedDeck: null,
+  lastFetched: null,
 };
+
+// デッキのフェッチ（必要に応じて）
+export const fetchDecksIfNeeded = createAsyncThunk(
+  'deck/fetchDecksIfNeeded',
+  async (_, { getState, rejectWithValue }) => {
+    const state = getState() as { deck: DeckState };
+    const { lastFetched } = state.deck;
+
+    // 最後のフェッチから5分経過していない場合はスキップ
+    if (lastFetched && Date.now() - lastFetched < 5 * 60 * 1000) {
+      return null;
+    }
+
+    try {
+      const response = await fetch('/api/decks');
+      if (!response.ok) {
+        throw new Error('デッキ一覧の取得に失敗しました');
+      }
+      const data = await response.json();
+      return data.map((deck: any) => ({
+        ...deck,
+        cards: deck.cards || [],
+        lastStudied: deck.lastStudied ? String(deck.lastStudied) : null,
+        groups: deck.groups || [],
+      }));
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'データの取得に失敗しました',
+      );
+    }
+  },
+);
+
+// デッキ詳細のフェッチ（必要に応じて）
+export const fetchDeckDetailsIfNeeded = createAsyncThunk(
+  'deck/fetchDeckDetailsIfNeeded',
+  async (deckId: string, { getState, rejectWithValue }) => {
+    const state = getState() as { deck: DeckState };
+    const { selectedDeck, lastFetched } = state.deck;
+
+    // 最後のフェッチから5分経過していない場合はスキップ
+    if (
+      selectedDeck?.id === deckId &&
+      lastFetched &&
+      Date.now() - lastFetched < 5 * 60 * 1000
+    ) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`/api/decks/${deckId}`);
+      if (!response.ok) {
+        throw new Error('デッキの取得に失敗しました');
+      }
+      const data = await response.json();
+      return {
+        ...data,
+        cards: data.cards || [],
+        lastStudied: data.lastStudied ? String(data.lastStudied) : null,
+        groups: data.groups || [],
+      };
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'データの取得に失敗しました',
+      );
+    }
+  },
+);
 
 const deckSlice = createSlice({
   name: 'deck',
@@ -95,6 +166,39 @@ const deckSlice = createSlice({
         state.selectedDeck.lastStudied = new Date().toISOString();
       }
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchDecksIfNeeded.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchDecksIfNeeded.fulfilled, (state, action) => {
+        if (action.payload) {
+          state.decks = action.payload;
+          state.lastFetched = Date.now();
+        }
+        state.isLoading = false;
+      })
+      .addCase(fetchDecksIfNeeded.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(fetchDeckDetailsIfNeeded.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchDeckDetailsIfNeeded.fulfilled, (state, action) => {
+        if (action.payload) {
+          state.selectedDeck = action.payload;
+          state.lastFetched = Date.now();
+        }
+        state.isLoading = false;
+      })
+      .addCase(fetchDeckDetailsIfNeeded.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
   },
 });
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Copy } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface DeckCardProps {
   title: string;
@@ -24,14 +25,17 @@ export const DeckCard: React.FC<DeckCardProps> = ({
 }) => {
   return (
     <div
-      className="bg-gray-50 rounded-lg shadow-sm p-4 mb-4 flex flex-col cursor-pointer hover:shadow-md transition-all border border-gray-100"
+      className={cn(
+        'bg-card rounded-lg shadow-sm p-4 mb-4 flex flex-col cursor-pointer hover:shadow-md transition-all border border-border',
+        onClick && 'hover:bg-accent/5',
+      )}
       onClick={onClick}
     >
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-bold text-gray-800 truncate">{title}</h3>
+        <h3 className="text-lg font-bold text-foreground truncate">{title}</h3>
         {shareCode && (
           <button
-            className="flex items-center text-blue-500 hover:text-blue-700 text-xs ml-2"
+            className="flex items-center text-primary hover:text-primary/80 text-xs ml-2 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               if (onCopyShareCode) onCopyShareCode(shareCode);
@@ -45,9 +49,11 @@ export const DeckCard: React.FC<DeckCardProps> = ({
         )}
       </div>
       {description && (
-        <p className="text-gray-600 text-sm mb-2 truncate">{description}</p>
+        <p className="text-muted-foreground text-sm mb-2 truncate">
+          {description}
+        </p>
       )}
-      <div className="flex items-center text-xs text-gray-500 mb-2">
+      <div className="flex items-center text-xs text-muted-foreground mb-2">
         <span>カード枚数: {cardCount}</span>
         {groups && groups.length > 0 && (
           <span className="ml-4">

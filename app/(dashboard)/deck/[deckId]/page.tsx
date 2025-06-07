@@ -31,10 +31,9 @@ import {
 import { DeckEditForm } from '@/components/decks/deck-edit-form';
 import { Edit2 } from 'lucide-react';
 import { MathRenderer } from '@/components/common/MathRenderer';
-import { useDispatch } from 'react-redux';
-import { setDecks, setSelectedDeck } from '@/lib/store/slices/deckSlice';
-import { AppDispatch } from '@/lib/store/store';
-import { AnyAction } from '@reduxjs/toolkit';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '@/lib/store/store';
+import { fetchDeckDetailsIfNeeded } from '@/lib/store/slices/deckSlice';
 import { HeaderNav } from '@/components/dashboard/header-nav';
 
 // 相対時間を計算する関数
@@ -65,9 +64,7 @@ export default function DeckDetailsPage() {
   const dispatch = useDispatch<AppDispatch>();
 
   // 追加: DashboardShell用のstate
-  const [groups, setGroups] = useState<Group[]>([]);
   const [groupMode, setGroupMode] = useState(false);
-  const [deckData, setDeckData] = useState<any>(null);
   const [editOpen, setEditOpen] = useState(false);
   // 進捗表示モードを2つに分ける
   const [pieProgressMode, setPieProgressMode] = useState<'all' | 'learned'>(
@@ -78,23 +75,9 @@ export default function DeckDetailsPage() {
   );
   const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/groups')
-      .then((res) => res.json())
-      .then(setGroups);
-    fetch('/api/decks')
-      .then((res) => res.json())
-      .then((data) => {
-        const decksArray: DeckWithCardsAndGroups[] = data.map((deck: any) => ({
-          ...deck,
-          cards: deck.cards || [],
-          lastStudied: deck.lastStudied ? String(deck.lastStudied) : null,
-          groups: deck.groups || [],
-        }));
-        setDecks(decksArray);
-        dispatch(setDecks(decksArray));
-      });
-  }, [dispatch]);
+  const { selectedDeck: deckData, isLoading } = useSelector(
+    (state: RootState) => state.deck,
+  );
 
   // スクロールイベント
   useEffect(() => {
@@ -113,27 +96,11 @@ export default function DeckDetailsPage() {
   }, []);
 
   useEffect(() => {
-    if (!deckId) return;
-    fetch(`/api/decks/${deckId}`).then(async (res) => {
-      if (!res.ok) {
-        // エラー時はnullをセット
-        setDeckData(null);
-        return;
-      }
-      // レスポンスが空の場合もnull
-      const text = await res.text();
-      if (!text) {
-        setDeckData(null);
-        return;
-      }
-      const data = JSON.parse(text);
-      setDeckData(data);
-      dispatch(setSelectedDeck(data));
-    });
+    if (!deckId || Array.isArray(deckId)) return;
+    dispatch(fetchDeckDetailsIfNeeded(deckId));
   }, [deckId, dispatch]);
 
   if (!deckId) {
-    // パラメータがまだ取得できていない場合
     return (
       <div className="min-h-screen flex flex-col">
         <HeaderNav
@@ -150,8 +117,7 @@ export default function DeckDetailsPage() {
     );
   }
 
-  if (!deckData) {
-    // パラメータはあるが該当データがない場合
+  if (isLoading || !deckData) {
     return (
       <div className="min-h-screen flex flex-col">
         <HeaderNav
@@ -180,16 +146,11 @@ export default function DeckDetailsPage() {
 
   // グラフデータの準備
   const chartData = deckData.progressHistory
-    .map((history: StudyHistory) => {
-      // 履歴データから直接進捗率を取得
-      const progress = history.progress;
-
-      return {
-        ...history,
-        date: getRelativeTime(history.createdAt),
-        progress,
-      };
-    })
+    .map((history: StudyHistory) => ({
+      ...history,
+      date: getRelativeTime(history.createdAt),
+      progress: history.progress,
+    }))
     .reverse();
 
   // 円グラフ用の進捗計算
@@ -240,7 +201,7 @@ export default function DeckDetailsPage() {
               </Button>
             </span>
           }
-          description={<MathRenderer text={deckData.description} />}
+          description={<MathRenderer text={deckData.description ?? ''} />}
         >
           <Link href="/dashboard">
             <Button variant="outline" className="h-10">
@@ -427,12 +388,11 @@ export default function DeckDetailsPage() {
             <DeckEditForm
               deckId={deckId as string}
               initialTitle={deckData.title}
-              initialDescription={deckData.description}
+              initialDescription={deckData.description ?? ''}
               onSuccess={async () => {
                 setEditOpen(false);
                 // 更新後に再フェッチ
-                const res = await fetch(`/api/decks/${deckId}`);
-                if (res.ok) setDeckData(await res.json());
+                dispatch(fetchDeckDetailsIfNeeded(deckId as string));
               }}
             />
           </DialogContent>

@@ -9,4 +9,9 @@ export type DeckWithCardsAndGroups = Omit<Deck, 'lastStudied'> & {
   cards: { id: string; status: string }[];
   /** 紐づくグループ一覧 */
   groups: Group[];
+  /** 学習履歴 */
+  progressHistory: {
+    progress: number;
+    createdAt: string;
+  }[];
 };

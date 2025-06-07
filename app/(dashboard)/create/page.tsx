@@ -65,21 +65,48 @@ export default function CreatePage() {
   // サブスクリプション情報の取得
   useEffect(() => {
     const fetchSubscription = async () => {
-      try {
-        const subscriptionResponse = await fetch('/api/subscription/status');
-        if (!subscriptionResponse.ok) {
-          throw new Error('サブスクリプション情報の取得に失敗しました');
+      let retryCount = 0;
+      const maxRetries = 3;
+      const retryDelay = 1000; // 1秒
+
+      const attemptFetch = async () => {
+        try {
+          const subscriptionResponse = await fetch('/api/subscription/status', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-store',
+          });
+
+          if (!subscriptionResponse.ok) {
+            throw new Error(
+              `HTTP error! status: ${subscriptionResponse.status}`,
+            );
+          }
+
+          const subscriptionData: Subscription =
+            await subscriptionResponse.json();
+          dispatch({
+            type: 'user/setSubscription',
+            payload: subscriptionData,
+          });
+        } catch (error) {
+          console.error('サブスクリプション情報の取得に失敗しました:', error);
+
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`リトライ ${retryCount}/${maxRetries}...`);
+            setTimeout(attemptFetch, retryDelay * retryCount);
+          } else {
+            toast.error(
+              'サブスクリプション情報の取得に失敗しました。後でもう一度お試しください。',
+            );
+          }
         }
-        const subscriptionData: Subscription =
-          await subscriptionResponse.json();
-        dispatch({
-          type: 'user/setSubscription',
-          payload: subscriptionData,
-        });
-      } catch (error) {
-        console.error('サブスクリプション情報の取得に失敗しました:', error);
-        toast.error('サブスクリプション情報の取得に失敗しました');
-      }
+      };
+
+      attemptFetch();
     };
 
     fetchSubscription();

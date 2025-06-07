@@ -32,13 +32,34 @@ import { setSubscription } from '@/lib/store/slices/userSlice';
 import { useSubscription } from '@/hooks/use-subscription';
 import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 import { Loading } from '@/components/loading';
+import { HeaderNav } from '@/components/dashboard/header-nav';
 
 export default function BillingPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const subscription = useSubscription(); // subscription.stripeCurrentPeriodEnd は string | null
+  const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
   const [isLoading, setIsLoading] = useState(true);
-  const dispatch = useDispatch(); // dispatchはここでは直接使われていないですが、importは残しておきます
+  const dispatch = useDispatch();
+
+  // HeaderNav用のstate
+  const [groupMode, setGroupMode] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // スクロールイベント
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setScrolled(window.scrollY > 10);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -136,101 +157,119 @@ export default function BillingPage() {
     }
   };
 
-  if (isLoading || status === 'loading') {
-    return <Loading />;
+  if (isLoading || isSubscriptionLoading || status === 'loading') {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <HeaderNav
+          groupMode={groupMode}
+          setGroupMode={setGroupMode}
+          scrolled={scrolled}
+        />
+        <main className="flex-1 flex items-center justify-center">
+          <Loading />
+        </main>
+      </div>
+    );
   }
 
   const isProPlan =
     subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';
 
   return (
-    <div className="min-h-screen bg-primary/5">
-      {/* Header */}
-      <header className="shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <button
-                onClick={() => router.back()}
-                className="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 mr-4"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-bold">課金情報</h1>
+    <div className="min-h-screen flex flex-col">
+      <HeaderNav
+        groupMode={groupMode}
+        setGroupMode={setGroupMode}
+        scrolled={scrolled}
+      />
+      <main className="flex-1">
+        {/* Header */}
+        <header className="shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-6">
+              <div className="flex items-center">
+                <button
+                  onClick={() => router.back()}
+                  className="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 mr-4"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <h1 className="text-2xl font-bold">課金情報</h1>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="max-w-2xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>現在のプラン</CardTitle>
-              <CardDescription>
-                {subscription?.plan === 'PRO_MONTHLY'
-                  ? 'プロプラン（月額）'
-                  : subscription?.plan === 'PRO_YEARLY'
-                  ? 'プロプラン（年額）'
-                  : '無料プラン'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">ステータス</span>
-                  <span className="font-medium">
-                    {subscription?.status === 'ACTIVE'
-                      ? '有効'
-                      : subscription?.status === 'CANCELED'
-                      ? 'キャンセル済み'
-                      : subscription?.status === 'PAST_DUE'
-                      ? '支払い期限切れ'
-                      : subscription?.status === 'TRIALING'
-                      ? 'トライアル中'
-                      : '無効'}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">
-                    {subscription?.status === 'CANCELED'
-                      ? '利用可能期限'
-                      : '次回請求日'}
-                  </span>
-                  <span className="font-medium">
-                    {subscription?.status === 'CANCELED'
-                      ? getSubscriptionEndDate(
-                          // ここでDateオブジェクトに変換して渡す
-                          getPeriodEndAsDate(
-                            subscription?.stripeCurrentPeriodEnd,
-                          ),
-                        )
-                      : formatDate(subscription?.stripeCurrentPeriodEnd)}
-                  </span>
-                </div>
-                {subscription?.status === 'CANCELED' && (
-                  <div className="text-sm text-muted-foreground">
-                    現在のプランは
-                    {formatDate(subscription?.stripeCurrentPeriodEnd)}
-                    まで利用可能です
+        {/* Main content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-2xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>現在のプラン</CardTitle>
+                <CardDescription>
+                  {subscription?.plan === 'PRO_MONTHLY'
+                    ? 'プロプラン（月額）'
+                    : subscription?.plan === 'PRO_YEARLY'
+                    ? 'プロプラン（年額）'
+                    : '無料プラン'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">ステータス</span>
+                    <span className="font-medium">
+                      {subscription?.status === 'ACTIVE'
+                        ? '有効'
+                        : subscription?.status === 'CANCELED'
+                        ? 'キャンセル済み'
+                        : subscription?.status === 'PAST_DUE'
+                        ? '支払い期限切れ'
+                        : subscription?.status === 'TRIALING'
+                        ? 'トライアル中'
+                        : '無効'}
+                    </span>
                   </div>
+                  <Separator />
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">
+                      {subscription?.status === 'CANCELED'
+                        ? '利用可能期限'
+                        : '次回請求日'}
+                    </span>
+                    <span className="font-medium">
+                      {subscription?.status === 'CANCELED'
+                        ? getSubscriptionEndDate(
+                            // ここでDateオブジェクトに変換して渡す
+                            getPeriodEndAsDate(
+                              subscription?.stripeCurrentPeriodEnd,
+                            ),
+                          )
+                        : formatDate(subscription?.stripeCurrentPeriodEnd)}
+                    </span>
+                  </div>
+                  {subscription?.status === 'CANCELED' && (
+                    <div className="text-sm text-muted-foreground">
+                      現在のプランは
+                      {formatDate(subscription?.stripeCurrentPeriodEnd)}
+                      まで利用可能です
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                {isProPlan ? (
+                  <Button onClick={handleManageSubscription}>
+                    サブスクリプションを管理
+                  </Button>
+                ) : (
+                  <Button onClick={() => router.push('/subscription')}>
+                    アップグレード
+                  </Button>
                 )}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              {isProPlan ? (
-                <Button onClick={handleManageSubscription}>
-                  サブスクリプションを管理
-                </Button>
-              ) : (
-                <Button onClick={() => router.push('/subscription')}>
-                  アップグレード
-                </Button>
-              )}
-            </CardFooter>
-          </Card>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
       </main>
     </div>

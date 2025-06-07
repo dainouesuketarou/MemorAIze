@@ -31,7 +31,7 @@ export function AiLimitBadge({
   const { limit, isLoading } = useSelector(
     (state: RootState) => state.aiGenerationLimit,
   );
-  const subscription = useSubscription();
+  const { subscription } = useSubscription();
   const userId = useSelector((state: RootState) => state.user.id);
 
   useEffect(() => {
