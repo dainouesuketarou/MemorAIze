@@ -166,6 +166,46 @@ const deckSlice = createSlice({
         state.selectedDeck.lastStudied = new Date().toISOString();
       }
     },
+    deleteCard: (
+      state,
+      action: PayloadAction<{ deckId: string; cardId: string }>,
+    ) => {
+      const deck = state.decks.find((d) => d.id === action.payload.deckId);
+      if (deck) {
+        deck.cards = deck.cards.filter((c) => c.id !== action.payload.cardId);
+        deck.cardCount = deck.cards.length;
+      }
+      if (state.selectedDeck?.id === action.payload.deckId) {
+        state.selectedDeck.cards = state.selectedDeck.cards.filter(
+          (c) => c.id !== action.payload.cardId,
+        );
+        state.selectedDeck.cardCount = state.selectedDeck.cards.length;
+      }
+    },
+    updateCardStatus: (
+      state,
+      action: PayloadAction<{
+        deckId: string;
+        cardId: string;
+        status: 'UNLEARNED' | 'MASTERED' | 'STRUGGLING';
+      }>,
+    ) => {
+      const deck = state.decks.find((d) => d.id === action.payload.deckId);
+      if (deck) {
+        const card = deck.cards.find((c) => c.id === action.payload.cardId);
+        if (card) {
+          card.status = action.payload.status;
+        }
+      }
+      if (state.selectedDeck?.id === action.payload.deckId) {
+        const card = state.selectedDeck.cards.find(
+          (c) => c.id === action.payload.cardId,
+        );
+        if (card) {
+          card.status = action.payload.status;
+        }
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -223,6 +263,8 @@ export const {
   setSort,
   setSelectedDeck,
   updateDeckProgress,
+  deleteCard,
+  updateCardStatus,
 } = deckSlice.actions;
 
 export type DeckAction = ReturnType<

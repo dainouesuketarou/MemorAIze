@@ -7,7 +7,10 @@ export async function POST(req: NextRequest) {
   try {
     const { deckId, front, back } = await req.json();
     if (!deckId || !front || !back) {
-      return NextResponse.json({ error: 'deckId, front, backは必須です' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'deckId, front, backは必須です' },
+        { status: 400 },
+      );
     }
 
     // トランザクションで一括処理
@@ -42,7 +45,9 @@ export async function POST(req: NextRequest) {
       if (deck) {
         // 全カード数に対する覚えたカードの割合を計算
         const totalCards = deck.cards.length;
-        const masteredCount = deck.cards.filter(card => card.status === 'MASTERED').length;
+        const masteredCount = deck.cards.filter(
+          (card) => card.status === 'MASTERED',
+        ).length;
         const progress = totalCards > 0 ? masteredCount / totalCards : 0;
 
         await tx.deck.update({
@@ -59,6 +64,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (e) {
-    return NextResponse.json({ error: 'カード追加エラー', detail: String(e) }, { status: 500 });
+    return NextResponse.json(
+      { error: 'カード追加エラー', detail: String(e) },
+      { status: 500 },
+    );
   }
-} 
+}

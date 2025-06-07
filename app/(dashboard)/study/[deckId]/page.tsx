@@ -21,6 +21,7 @@ import {
   updateDeckProgress,
   fetchDeckDetailsIfNeeded,
   updateDeck,
+  updateCardStatus as updateDeckCardStatus,
 } from '@/lib/store/slices/deckSlice';
 import { AnyAction } from '@reduxjs/toolkit';
 import { MathRenderer } from '@/components/common/MathRenderer';
@@ -225,6 +226,13 @@ export default function StudyPage() {
 
     const cardId = currentCard.id;
     dispatch(updateCardStatus({ cardId, status: 'MASTERED' }));
+    dispatch(
+      updateDeckCardStatus({
+        deckId: deckId as string,
+        cardId,
+        status: 'MASTERED',
+      }),
+    );
     setStudyResults((prev) => [...prev, { id: cardId, mastered: true }]);
     setMasteredCount((p) => Math.min(p + 1, totalCards));
 
@@ -240,6 +248,13 @@ export default function StudyPage() {
 
     const cardId = currentCard.id;
     dispatch(updateCardStatus({ cardId, status: 'STRUGGLING' }));
+    dispatch(
+      updateDeckCardStatus({
+        deckId: deckId as string,
+        cardId,
+        status: 'STRUGGLING',
+      }),
+    );
     setStudyResults((prev) => [...prev, { id: cardId, mastered: false }]);
     setMasteredCount((p) => Math.max(p - 1, 0));
 

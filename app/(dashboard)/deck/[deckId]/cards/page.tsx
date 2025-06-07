@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '@/lib/store/store';
+import { deleteCard } from '@/lib/store/slices/deckSlice';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { DashboardShell } from '@/components/dashboard/shell';
 import { Button } from '@/components/ui/button';
@@ -42,6 +45,7 @@ import { setDecks } from '@/lib/store/slices/deckSlice';
 export default function CardsPage() {
   const router = useRouter();
   const { deckId } = useParams();
+  const dispatch = useDispatch<AppDispatch>();
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [decks] = useState<DeckWithCardsAndGroups[]>([]);
@@ -111,8 +115,16 @@ export default function CardsPage() {
     try {
       const response = await fetch(`/api/cards/${cardId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deckId }),
       });
       if (!response.ok) throw new Error();
+
+      // Reduxの状態を更新
+      dispatch(deleteCard({ deckId: deckId as string, cardId }));
+
       toast.success('カードを削除しました');
       handleCardAddSuccess();
     } catch {
