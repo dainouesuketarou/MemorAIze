@@ -48,10 +48,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    // デッキとグループのデータを必要に応じてフェッチ
-    dispatch(fetchDecksIfNeeded() as unknown as AnyAction);
-    dispatch(fetchGroupsIfNeeded() as unknown as AnyAction);
-  }, [session?.user?.id, dispatch]);
+    // データが存在しない場合のみフェッチ
+    if (!reduxDecks.length || !reduxGroups.length) {
+      dispatch(fetchDecksIfNeeded() as unknown as AnyAction);
+      dispatch(fetchGroupsIfNeeded() as unknown as AnyAction);
+    }
+  }, [session?.user?.id, dispatch, reduxDecks.length, reduxGroups.length]);
 
   // フィルタリングとソートの適用
   const filteredAndSortedDecks = useMemo(() => {

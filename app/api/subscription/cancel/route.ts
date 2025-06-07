@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
+import { toZonedTime } from 'date-fns-tz';
 
 export async function POST() {
   try {
@@ -38,16 +39,18 @@ export async function POST() {
           data: {
             status: 'CANCELED',
             cancelAtPeriodEnd: true,
-            stripeCurrentPeriodEnd: new Date(
-              (stripeSubscription as any).current_period_end * 1000,
+            stripeCurrentPeriodEnd: toZonedTime(
+              new Date((stripeSubscription as any).current_period_end * 1000),
+              'Asia/Tokyo',
             ),
           },
         });
 
         return NextResponse.json({
           message: 'サブスクリプションはすでにキャンセルされています',
-          currentPeriodEnd: new Date(
-            (stripeSubscription as any).current_period_end * 1000,
+          currentPeriodEnd: toZonedTime(
+            new Date((stripeSubscription as any).current_period_end * 1000),
+            'Asia/Tokyo',
           ),
         });
       }
@@ -67,8 +70,11 @@ export async function POST() {
         data: {
           status: 'CANCELED',
           cancelAtPeriodEnd: true,
-          stripeCurrentPeriodEnd: new Date(
-            (updatedStripeSubscription as any).current_period_end * 1000,
+          stripeCurrentPeriodEnd: toZonedTime(
+            new Date(
+              (updatedStripeSubscription as any).current_period_end * 1000,
+            ),
+            'Asia/Tokyo',
           ),
         },
       });

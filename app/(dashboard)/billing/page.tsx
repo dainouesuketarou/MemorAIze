@@ -122,16 +122,27 @@ export default function BillingPage() {
     if (!dateString) return 'なし';
     const date =
       typeof dateString === 'string' ? new Date(dateString) : dateString;
-    // Date-fnsのformatを使う場合は、以下のように変換が必要です
-    // return format(date, 'yyyy年MM月dd日', { locale: ja });
-    return date.toLocaleDateString('ja-JP');
+    // 日本時間に変換
+    const jpDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    return jpDate.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Tokyo',
+    });
   };
 
   const getSubscriptionEndDate = (date: Date | null) => {
     if (!date) return 'なし';
-    const endDate = new Date(date); // Dateオブジェクトとして受け取る
-    endDate.setDate(endDate.getDate() - 1); // 前日を計算
-    return endDate.toLocaleDateString('ja-JP');
+    // 日本時間に変換
+    const jpDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    jpDate.setDate(jpDate.getDate() - 1); // 前日を計算
+    return jpDate.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Tokyo',
+    });
   };
 
   // subscription?.stripeCurrentPeriodEnd を Dateオブジェクトに変換するヘルパー関数
@@ -146,7 +157,8 @@ export default function BillingPage() {
         console.warn('Invalid date string for conversion:', dateString);
         return null;
       }
-      return date;
+      // 日本時間に変換
+      return new Date(date.getTime() + 9 * 60 * 60 * 1000);
     } catch (error) {
       console.error(
         'Error converting date string to Date object:',

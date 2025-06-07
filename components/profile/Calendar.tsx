@@ -30,15 +30,22 @@ export const Calendar: React.FC<CalendarProps> = ({
           currentMonth.getMonth() + 1,
           0,
         );
+
+        const jpStart = new Date(start.getTime() + 9 * 60 * 60 * 1000);
+        const jpEnd = new Date(end.getTime() + 9 * 60 * 60 * 1000);
+
         const res = await fetch(
-          `/api/auth/login-history?start=${start.toISOString()}&end=${end.toISOString()}`,
+          `/api/auth/login-history?start=${jpStart.toISOString()}&end=${jpEnd.toISOString()}`,
         );
         if (!res.ok) {
           throw new Error('ログイン履歴の取得に失敗しました');
         }
         const data = await res.json();
         setLoginDates(
-          data.map((item: { loginAt: string }) => new Date(item.loginAt)),
+          data.map((item: { loginAt: string }) => {
+            const date = new Date(item.loginAt);
+            return new Date(date.getTime() + 9 * 60 * 60 * 1000);
+          }),
         );
       } catch (error) {
         console.error('Error fetching login history:', error);

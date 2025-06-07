@@ -34,8 +34,9 @@ export function AiLimitBadge({
   const { subscription } = useSubscription();
   const userId = useSelector((state: RootState) => state.user.id);
 
+  // AI生成制限の取得は不要（Reduxから取得）
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || limit) return;
 
     const fetchLimit = async () => {
       try {
@@ -53,7 +54,7 @@ export function AiLimitBadge({
     };
 
     fetchLimit();
-  }, [userId, dispatch]);
+  }, [userId, dispatch, limit]);
 
   // 学習画面では表示しない
   if (hideInStudy) return null;

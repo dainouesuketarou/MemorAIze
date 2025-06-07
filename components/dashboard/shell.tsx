@@ -75,68 +75,22 @@ export function DashboardShell({
   const [showResults, setShowResults] = useState(false);
   const [limit, setLimit] = useState<AiGenerationLimit | null>(null);
   const [loading, setLoading] = useState(true);
-  const [decks] = useState<DeckWithCardsAndGroups[]>([]);
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardPage = pathname === '/dashboard';
 
-  // Reduxの読み込み状態を取得
-  const { isLoading: decksLoading } = useSelector(
+  // Reduxの状態を取得
+  const { decks, isLoading: decksLoading } = useSelector(
     (state: RootState) => state.deck,
   );
   const { isLoading: groupsLoading } = useSelector(
     (state: RootState) => state.group,
   );
 
-  // 初期データの読み込み
+  // 初期データの読み込みは不要（Reduxから取得）
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchData = async () => {
-      try {
-        dispatch(setDecksLoading(true));
-        dispatch(setGroupsLoading(true));
-
-        // デッキの取得
-        const decksRes = await fetch('/api/decks');
-        if (!decksRes.ok) throw new Error('デッキ一覧の取得に失敗しました');
-        const decksData = await decksRes.json();
-
-        if (isMounted) {
-          const formattedDecks = decksData.map((deck: any) => ({
-            ...deck,
-            cards: deck.cards || [],
-            lastStudied: deck.lastStudied ? String(deck.lastStudied) : null,
-            groups: deck.groups || [],
-          }));
-          dispatch(setDecks(formattedDecks));
-        }
-
-        // グループの取得
-        const groupsRes = await fetch('/api/groups');
-        if (!groupsRes.ok) throw new Error('グループ一覧の取得に失敗しました');
-        const groupsData = await groupsRes.json();
-
-        if (isMounted) {
-          dispatch(setGroups(groupsData));
-        }
-      } catch (error) {
-        console.error('データ取得エラー:', error);
-      } finally {
-        if (isMounted) {
-          dispatch(setDecksLoading(false));
-          dispatch(setGroupsLoading(false));
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [dispatch]);
+    setLoading(false);
+  }, []);
 
   // スクロールイベントの最適化
   useEffect(() => {
@@ -181,7 +135,9 @@ export function DashboardShell({
   const filteredDecks = useMemo(() => {
     if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
-    return decks.filter((deck) => deck.title.toLowerCase().includes(query));
+    return decks.filter((deck: DeckWithCardsAndGroups) =>
+      deck.title.toLowerCase().includes(query),
+    );
   }, [decks, searchQuery]);
 
   // 検索ハンドラーの最適化

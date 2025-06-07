@@ -7,7 +7,7 @@ import { toZonedTime } from 'date-fns-tz';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 // ログイン履歴を記録
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const session = await getAuthSession();
     if (!session?.user?.email) {
@@ -25,11 +25,15 @@ export async function POST() {
       );
     }
 
+    // リクエストボディから日時を取得（指定がない場合は現在時刻）
+    const body = await req.json();
+    const loginAt = body.loginAt ? new Date(body.loginAt) : new Date();
+
     // 日本時間でログイン時刻を記録
     const loginHistory = await prisma.loginHistory.create({
       data: {
         userId: user.id,
-        loginAt: toZonedTime(new Date(), 'Asia/Tokyo'),
+        loginAt: toZonedTime(loginAt, 'Asia/Tokyo'),
       },
     });
 
@@ -44,17 +48,32 @@ export async function POST() {
 }
 
 // 特定の期間のログイン履歴を取得
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+
+    const where = {
+      userId: session.user.id,
+      ...(start && end
+        ? {
+            loginAt: {
+              gte: toZonedTime(new Date(start), 'Asia/Tokyo'),
+              lte: toZonedTime(new Date(end), 'Asia/Tokyo'),
+            },
+          }
+        : {}),
+    };
+
     const loginHistory = await prisma.loginHistory.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
+      where,
+      orderBy: { loginAt: 'desc' },
     });
 
     return NextResponse.json(loginHistory);

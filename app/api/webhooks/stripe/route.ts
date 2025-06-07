@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 import type Stripe from 'stripe';
 import { STRIPE_PRICE_IDS } from '@/lib/stripe'; // STRIPE_PRICE_IDSをインポート
+import { toZonedTime } from 'date-fns-tz';
 
 // 動的レンダリングを明示的に指定
 export const dynamic = 'force-dynamic';
@@ -92,8 +93,9 @@ export async function POST(req: Request) {
             stripePriceId: priceId,
             status: initialStatus,
             plan: plan,
-            stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000,
+            stripeCurrentPeriodEnd: toZonedTime(
+              new Date(subscription.current_period_end * 1000),
+              'Asia/Tokyo',
             ),
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
           },
@@ -102,8 +104,9 @@ export async function POST(req: Request) {
             stripePriceId: priceId,
             status: initialStatus,
             plan: plan,
-            stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000,
+            stripeCurrentPeriodEnd: toZonedTime(
+              new Date(subscription.current_period_end * 1000),
+              'Asia/Tokyo',
             ),
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
           },
@@ -156,8 +159,9 @@ export async function POST(req: Request) {
           data: {
             status,
             plan,
-            stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000,
+            stripeCurrentPeriodEnd: toZonedTime(
+              new Date(subscription.current_period_end * 1000),
+              'Asia/Tokyo',
             ),
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
             stripePriceId: priceId,
@@ -261,8 +265,9 @@ export async function POST(req: Request) {
           },
           data: {
             status: 'ACTIVE',
-            stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000,
+            stripeCurrentPeriodEnd: toZonedTime(
+              new Date(subscription.current_period_end * 1000),
+              'Asia/Tokyo',
             ),
             plan: plan,
             stripePriceId: priceId,

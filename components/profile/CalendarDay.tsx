@@ -26,10 +26,10 @@ export const CalendarDay: React.FC<CalendarDayProps> = ({
       return `${baseStyles} text-gray-300`;
     }
     if (isToday(date)) {
-      return `${baseStyles} border-2 border-blue-400 font-bold text-blue-600`;
+      return `${baseStyles} border-2 border-primary font-bold text-primary`;
     }
     if (hasActivity) {
-      return `${baseStyles} bg-blue-500 text-white font-medium transform hover:scale-105`;
+      return `${baseStyles} bg-primary text-white font-medium transform hover:scale-105`;
     }
     return `${baseStyles} text-gray-700 hover:bg-gray-100`;
   };

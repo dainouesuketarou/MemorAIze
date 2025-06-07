@@ -46,9 +46,17 @@ export default function LoginPage() {
       const response = await fetch('/api/auth/onboarding/status');
       const data = await response.json();
 
-      // ログイン履歴を記録
+      // ログイン履歴を記録（日本時間で記録）
+      const now = new Date();
+      const jpNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
       await fetch('/api/auth/login-history', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          loginAt: jpNow.toISOString(),
+        }),
       });
 
       if (!data.isOnboarded) {

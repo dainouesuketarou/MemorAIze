@@ -47,31 +47,14 @@ export function Sidebar({
   const { data: session } = useSession();
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
+  const reduxGroups = useSelector((state: RootState) => state.group.groups);
 
-  // グループの取得
-  const fetchGroups = useCallback(async () => {
-    if (!session?.user?.id) return;
-
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/groups`);
-      if (!response.ok) throw new Error('グループの取得に失敗しました');
-      const data = await response.json();
-      setGroups(data);
-      dispatch(setGroups(data) as unknown as AnyAction);
-    } catch (error) {
-      console.error('グループ取得エラー:', error);
-      toast.error('グループの取得に失敗しました');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [session?.user?.id, dispatch]);
-
+  // グループの取得は不要（Reduxから取得）
   useEffect(() => {
-    if (session?.user?.id) {
-      fetchGroups();
+    if (session?.user?.id && reduxGroups.length > 0) {
+      setGroups(reduxGroups);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, reduxGroups, setGroups]);
 
   /* ---------------「すべて」タブを挿入 --------------- */
   const allTab = useMemo(
@@ -87,7 +70,10 @@ export function Sidebar({
     [session?.user?.id],
   );
 
-  const displayGroups = useMemo(() => [allTab, ...groups], [allTab, groups]);
+  const displayGroups = useMemo(
+    () => [allTab, ...reduxGroups],
+    [allTab, reduxGroups],
+  );
 
   /* ───────────────── 追加 ───────────────── */
   const handleAddGroup = useCallback(async () => {
@@ -116,8 +102,7 @@ export function Sidebar({
       }
 
       const newGroup = await response.json();
-      dispatch(setGroups([...groups, newGroup]) as unknown as AnyAction);
-      setGroups([...groups, newGroup]);
+      dispatch(setGroups([...reduxGroups, newGroup]) as unknown as AnyAction);
       setNewGroupName('');
       setShowGroupInput(false);
       toast.success('グループを作成しました');
@@ -130,7 +115,7 @@ export function Sidebar({
     } finally {
       dispatch(setLoading(false) as unknown as AnyAction);
     }
-  }, [newGroupName, session?.user?.id, groups, dispatch, setGroups]);
+  }, [newGroupName, session?.user?.id, reduxGroups, dispatch]);
 
   /* ───────────────── 削除 ───────────────── */
   const handleDeleteGroup = useCallback(
@@ -148,7 +133,6 @@ export function Sidebar({
         }
 
         dispatch(deleteGroup(groupId) as unknown as AnyAction);
-        setGroups(groups.filter((g) => g.id !== groupId));
         toast.success('グループを削除しました');
       } catch (error) {
         console.error('グループ削除エラー:', error);
@@ -160,7 +144,7 @@ export function Sidebar({
         dispatch(setLoading(false) as unknown as AnyAction);
       }
     },
-    [groups, dispatch, setGroups],
+    [dispatch],
   );
 
   const handleGroupSelect = useCallback(

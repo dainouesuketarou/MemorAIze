@@ -11,6 +11,11 @@ import { RootState } from '@/lib/store/store';
 // import { Subscription } from '@prisma/client'; // ここは削除またはコメントアウト
 import { setSubscription } from '@/lib/store/slices/userSlice';
 import { Button } from '../ui/button';
+import { setDecks } from '@/lib/store/slices/deckSlice';
+import {
+  setImportedDecks,
+  removeImportedDeck,
+} from '@/lib/store/slices/importedDeckSlice';
 
 // userSlice.ts から直接型をインポートすることを強く推奨します
 // これにより、型の重複定義と不一致を防げます
@@ -31,18 +36,20 @@ interface ShareModalProps {
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
-  const [myDecks, setMyDecks] = useState<Deck[]>([]);
   const [loading, setLoading] = useState(false);
   const [importCode, setImportCode] = useState('');
   const [importing, setImporting] = useState(false);
-  const [importedDecks, setImportedDecks] = useState<Deck[]>([]);
   const [importLoading, setImportLoading] = useState<string | null>(null);
   const router = useRouter();
 
+  const dispatch = useDispatch();
   const subscription = useSelector(
     (state: RootState) => state.user.subscription,
   );
-  const dispatch = useDispatch();
+  const decks = useSelector((state: RootState) => state.deck.decks);
+  const importedDecks = useSelector(
+    (state: RootState) => state.importedDeck.decks,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -50,14 +57,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
     fetch('/api/decks')
       .then((res) => res.json())
       .then((data) => {
-        setMyDecks(data);
+        dispatch(setDecks(data));
         setLoading(false);
       })
       .catch(() => {
         toast.error('暗記帳の取得に失敗しました');
         setLoading(false);
       });
-    setImportedDecks([]);
     setImportCode('');
 
     const fetchSubscription = async () => {
@@ -97,7 +103,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
       if (!res.ok) {
         toast.error(data.error || 'インポートに失敗しました');
       } else {
-        setImportedDecks((prev) => [data.data, ...prev]);
+        dispatch(setImportedDecks([data.data, ...importedDecks]));
         toast.success('暗記帳をインポートしました');
         setImportCode('');
       }
@@ -113,7 +119,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
     try {
       const res = await fetch(`/api/decks/${deckId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
-      setImportedDecks((prev) => prev.filter((deck) => deck.id !== deckId));
+      dispatch(removeImportedDeck(deckId));
       toast.success('インポートした暗記帳を削除しました');
     } catch {
       toast.error('削除に失敗しました');
@@ -142,12 +148,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
             <div className="text-muted-foreground py-8 text-center">
               読み込み中...
             </div>
-          ) : myDecks.length === 0 ? (
+          ) : decks.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center">
               暗記帳がありません
             </div>
           ) : (
-            myDecks.map((deck) => (
+            decks.map((deck) => (
               <DeckCard
                 key={deck.id}
                 title={deck.title}
