@@ -1,3 +1,5 @@
+// components/share/ShareModal.tsx
+
 import React, { useEffect, useState } from 'react';
 import { DeckCard } from './DeckCard';
 import { toast } from 'sonner';
@@ -6,9 +8,13 @@ import { Sparkles, Trash2 } from 'lucide-react';
 import { ImportDeckButton } from '../deck/ImportDeckButton';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
-import { Subscription } from '@prisma/client';
+// import { Subscription } from '@prisma/client'; // ここは削除またはコメントアウト
 import { setSubscription } from '@/lib/store/slices/userSlice';
 import { Button } from '../ui/button';
+
+// userSlice.ts から直接型をインポートすることを強く推奨します
+// これにより、型の重複定義と不一致を防げます
+import { Subscription as ReduxSubscriptionType } from '@/lib/store/slices/userSlice';
 
 interface Deck {
   id: string;
@@ -56,13 +62,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
 
     const fetchSubscription = async () => {
       try {
-        // サブスクリプション情報を取得
         const subscriptionResponse = await fetch('/api/subscription/status');
         if (!subscriptionResponse.ok) {
           throw new Error('サブスクリプション情報の取得に失敗しました');
         }
 
-        const subscriptionData: Subscription =
+        // ここで ReduxSubscriptionType を使用
+        const subscriptionData: ReduxSubscriptionType =
           await subscriptionResponse.json();
 
         // Reduxの状態を更新

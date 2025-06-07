@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 
-interface Subscription {
+export interface Subscription {
   status: SubscriptionStatus;
   plan: SubscriptionPlan;
   stripeSubscriptionId: string | null;
