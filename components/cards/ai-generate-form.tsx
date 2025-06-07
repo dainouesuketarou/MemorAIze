@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { useDispatch } from 'react-redux';
+import { addDeck } from '@/lib/store/slices/deckSlice';
+import { updateUsage } from '@/lib/store/slices/aiGenerationLimitSlice';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +64,7 @@ const formSchema = z.object({
 /* ===================================================================== */
 export function AiGenerateForm({ groups }: AiGenerateFormProps) {
   const router = useRouter();
+  const dispatch = useDispatch();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
@@ -136,17 +140,22 @@ export function AiGenerateForm({ groups }: AiGenerateFormProps) {
       setTitle(json.data.title);
       setCards(json.data.cards);
       setLastPayload(payload);
+
+      // ReduxのStateを更新
+      dispatch(addDeck(json.data.deck));
+      dispatch(updateUsage({ monthlyUsage: json.data.remainingGenerations }));
+
       toast({
         title: '暗記カードを生成しました',
         description: 'プレビュー画面で編集できます。',
       });
-    } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : '予期せぬエラーが発生しました';
-      setError(msg);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : '予期せぬエラーが発生しました';
+      setError(errorMessage);
       toast({
         title: 'エラーが発生しました',
-        description: msg,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
