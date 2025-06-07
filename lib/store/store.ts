@@ -6,6 +6,7 @@ import aiGenerationLimitReducer from './slices/aiGenerationLimitSlice';
 import studyProgressReducer from './slices/studyProgressSlice';
 import studyReducer from './slices/studySlice';
 import importedDeckReducer from './slices/importedDeckSlice';
+import loginHistoryReducer from './slices/loginHistorySlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     studyProgress: studyProgressReducer,
     study: studyReducer,
     importedDeck: importedDeckReducer,
+    loginHistory: loginHistoryReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

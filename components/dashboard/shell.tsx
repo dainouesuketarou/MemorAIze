@@ -17,22 +17,12 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Deck, Group } from '@prisma/client';
 import { DeckWithCardsAndGroups } from '@/types/deck';
 import { useRouter, usePathname } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
 import { AiLimitBadge } from '@/components/dashboard/ai-limit-badge';
 import { Loading } from '../loading';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/lib/store/store';
-import {
-  setDecks,
-  setLoading as setDecksLoading,
-} from '@/lib/store/slices/deckSlice';
-import {
-  setGroups,
-  setLoading as setGroupsLoading,
-} from '@/lib/store/slices/groupSlice';
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -73,7 +63,6 @@ export function DashboardShell({
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [limit, setLimit] = useState<AiGenerationLimit | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -106,29 +95,6 @@ export function DashboardShell({
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // AI生成制限の取得を最適化
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchLimit = async () => {
-      try {
-        const response = await fetch('/api/ai-generation-limit', {
-          signal: controller.signal,
-        });
-        const data = await response.json();
-        if (data.success) {
-          setLimit(data.data);
-        }
-      } catch (error: unknown) {
-        if (error instanceof Error && error.name !== 'AbortError') {
-          console.error('Error fetching AI generation limit:', error);
-        }
-      }
-    };
-
-    fetchLimit();
-    return () => controller.abort();
   }, []);
 
   // 検索結果のメモ化

@@ -10,12 +10,18 @@ import { toast } from 'sonner';
 
 export const useSubscription = () => {
   const dispatch = useDispatch();
-  const { subscription, isLoading, lastFetched } = useSelector(
+  const { subscription, isLoading, lastFetched, isAuthenticated } = useSelector(
     (state: RootState) => state.user,
   );
 
   useEffect(() => {
     const fetchSubscription = async () => {
+      // 未認証の場合は早期リターン
+      if (!isAuthenticated) {
+        dispatch(setLoading(false));
+        return;
+      }
+
       // 最後の取得から5分以内の場合は再取得しない
       if (lastFetched && Date.now() - lastFetched < 5 * 60 * 1000) {
         return;
@@ -24,12 +30,16 @@ export const useSubscription = () => {
       dispatch(setLoading(true));
       try {
         const response = await fetch('/api/subscription/status', {
+          credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
           },
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('認証が必要です。ログインしてください。');
+          }
           throw new Error('サブスクリプション情報の取得に失敗しました');
         }
 
@@ -37,8 +47,12 @@ export const useSubscription = () => {
         dispatch(setSubscription(data));
       } catch (error) {
         console.error('Error fetching subscription:', error);
-        dispatch(setError('サブスクリプション情報の取得に失敗しました'));
-        toast.error('サブスクリプション情報の取得に失敗しました');
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'サブスクリプション情報の取得に失敗しました';
+        dispatch(setError(errorMessage));
+        toast.error(errorMessage);
       } finally {
         dispatch(setLoading(false));
       }
@@ -51,7 +65,7 @@ export const useSubscription = () => {
     const interval = setInterval(fetchSubscription, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [dispatch, lastFetched]);
+  }, [dispatch, lastFetched, isAuthenticated]);
 
   return { subscription, isLoading };
 };

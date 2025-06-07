@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CalendarDay } from './CalendarDay';
-import { toast } from 'sonner';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import { setLoginHistory } from '@/lib/store/slices/loginHistorySlice';
 
 interface CalendarProps {
   currentMonth: Date;
@@ -13,12 +15,14 @@ export const Calendar: React.FC<CalendarProps> = ({
   setCurrentMonth,
 }) => {
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
-  const [loginDates, setLoginDates] = useState<Date[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const dispatch = useDispatch();
+  const loginHistory = useSelector(
+    (state: RootState) => state.loginHistory.history,
+  );
+  const loading = useSelector((state: RootState) => state.loginHistory.loading);
 
   useEffect(() => {
     const fetchLoginHistory = async () => {
-      setLoading(true);
       try {
         const start = new Date(
           currentMonth.getFullYear(),
@@ -41,21 +45,13 @@ export const Calendar: React.FC<CalendarProps> = ({
           throw new Error('ログイン履歴の取得に失敗しました');
         }
         const data = await res.json();
-        setLoginDates(
-          data.map((item: { loginAt: string }) => {
-            const date = new Date(item.loginAt);
-            return new Date(date.getTime() + 9 * 60 * 60 * 1000);
-          }),
-        );
+        dispatch(setLoginHistory(data));
       } catch (error) {
         console.error('Error fetching login history:', error);
-        toast.error('ログイン履歴の取得に失敗しました');
-      } finally {
-        setLoading(false);
       }
     };
     fetchLoginHistory();
-  }, [currentMonth]);
+  }, [currentMonth, dispatch]);
 
   useEffect(() => {
     const year = currentMonth.getFullYear();
@@ -95,12 +91,14 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const hasLoginActivity = (date: Date) => {
-    return loginDates.some(
-      (loginDate) =>
+    return loginHistory.some((item) => {
+      const loginDate = new Date(item.loginAt);
+      return (
         loginDate.getDate() === date.getDate() &&
         loginDate.getMonth() === date.getMonth() &&
-        loginDate.getFullYear() === date.getFullYear(),
-    );
+        loginDate.getFullYear() === date.getFullYear()
+      );
+    });
   };
 
   const formatMonthYear = (date: Date) => {

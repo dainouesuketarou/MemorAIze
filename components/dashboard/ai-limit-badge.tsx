@@ -2,19 +2,11 @@
 
 import { AlertCircle, Brain, LoaderCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '@/lib/store/store';
-import {
-  setLimit,
-  setLoading,
-  setError,
-} from '@/lib/store/slices/aiGenerationLimitSlice';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import Link from 'next/link';
 import { useSubscription } from '@/hooks/use-subscription';
-import { useEffect } from 'react';
-import { AiGenerationLimitResponse } from '@/types/ai-generation-limit';
+import { useAiGenerationLimit } from '@/hooks/use-ai-generation-limit';
 
 /**
  * ヘッダー用のコンパクト表示
@@ -27,34 +19,8 @@ export function AiLimitBadge({
   className?: string;
   hideInStudy?: boolean;
 }) {
-  const dispatch = useDispatch();
-  const { limit, isLoading } = useSelector(
-    (state: RootState) => state.aiGenerationLimit,
-  );
+  const { limit, isLoading } = useAiGenerationLimit();
   const { subscription } = useSubscription();
-  const userId = useSelector((state: RootState) => state.user.id);
-
-  // AI生成制限の取得は不要（Reduxから取得）
-  useEffect(() => {
-    if (!userId || limit) return;
-
-    const fetchLimit = async () => {
-      try {
-        const res = await fetch(`/api/ai-generation-limit?userId=${userId}`);
-        if (!res.ok) throw new Error('AI生成制限の取得に失敗しました');
-        const data: AiGenerationLimitResponse = await res.json();
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        dispatch(setLimit(data.limit));
-      } catch (error) {
-        console.error('AI生成制限取得エラー:', error);
-        dispatch(setError('AI生成制限の取得に失敗しました'));
-      }
-    };
-
-    fetchLimit();
-  }, [userId, dispatch, limit]);
 
   // 学習画面では表示しない
   if (hideInStudy) return null;
