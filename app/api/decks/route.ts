@@ -13,6 +13,7 @@ const createDeckSchema = z.object({
       back: z.string(),
     }),
   ),
+  groupIds: z.array(z.string()).optional(),
 });
 
 const prisma = new PrismaClient();
@@ -41,6 +42,11 @@ export async function POST(req: Request) {
             status: 'UNLEARNED',
           })),
         },
+        groups: validatedData.groupIds
+          ? {
+              connect: validatedData.groupIds.map((id) => ({ id })),
+            }
+          : undefined,
         shareCode: await getUniqueShareCode(prisma),
       },
       include: {

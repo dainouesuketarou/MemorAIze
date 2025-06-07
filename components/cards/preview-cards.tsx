@@ -9,6 +9,7 @@ import {
   Star,
   AlertCircle,
   RefreshCw,
+  LoaderCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,7 @@ import { MathRenderer } from '@/components/common/MathRenderer';
 import { MathText } from '@/components/common/MathText';
 import { Group } from '@prisma/client';
 import { FormLabel } from '@/components/ui/form';
+import { Badge } from '@/components/ui/badge';
 
 interface PreviewCard {
   id: string;
@@ -156,16 +158,44 @@ export function PreviewCards({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between sticky top-0 bg-background z-10 p-4 gap-4 sm:gap-0 border-b">
           <h2 className="text-xl sm:text-2xl font-bold">{title}</h2>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {onRegenerate && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {/* 選択されたグループの表示 */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    選択された分野:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {groups
+                      .filter((group) => selectedGroupIds.includes(group.id))
+                      .map((group) => (
+                        <Badge key={group.id} variant="secondary">
+                          {group.name}
+                        </Badge>
+                      ))}
+                  </div>
+                </div>
+              </div>
               <Button
+                type="button"
                 variant="outline"
-                onClick={() => setDialogOpen(true)}
-                className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                size="sm"
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
               >
-                <RefreshCw className="h-4 w-4" />
-                <span className="whitespace-nowrap">ブラッシュアップ</span>
+                {isRegenerating ? (
+                  <>
+                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                    再生成中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    ブラッシュアップ
+                  </>
+                )}
               </Button>
-            )}
+            </div>
             <Button
               onClick={onSave}
               disabled={isSaving}
@@ -310,34 +340,6 @@ export function PreviewCards({
             </Card>
           ))}
         </div>
-
-        {/* グループ選択 */}
-        <div className="space-y-2">
-          <FormLabel>分野（複数選択可）</FormLabel>
-          <div className="flex flex-wrap gap-2">
-            {groups.map((group) => (
-              <label
-                key={group.id}
-                className="flex items-center gap-1 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedGroupIds.includes(group.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      onGroupIdsChange([...selectedGroupIds, group.id]);
-                    } else {
-                      onGroupIdsChange(
-                        selectedGroupIds.filter((id) => id !== group.id),
-                      );
-                    }
-                  }}
-                />
-                <span>{group.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -369,7 +371,7 @@ export function PreviewCards({
               className="flex items-center gap-2"
             >
               {isRegenerating && (
-                <RefreshCw className={cn('h-4 w-4 animate-spin')} />
+                <LoaderCircle className={cn('h-4 w-4 animate-spin')} />
               )}
               {isRegenerating ? '再生成中...' : '再生成'}
             </Button>
