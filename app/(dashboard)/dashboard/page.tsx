@@ -1,94 +1,28 @@
 // app/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Group } from '@prisma/client';
+import { useState } from 'react';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { DashboardShell } from '@/components/dashboard/shell';
 import { DeckList } from '@/components/dashboard/deck-list';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
-import { DeckWithCardsAndGroups } from '@/types/deck';
 import { useSession } from 'next-auth/react';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { DeckFilter } from '@/components/dashboard/deck-filter';
-import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/lib/store/store';
-import {
-  setDecks,
-  setLoading,
-  setError,
-  setFilter,
-  setSort,
-  fetchDecksIfNeeded,
-} from '@/lib/store/slices/deckSlice';
-import { setGroups, fetchGroupsIfNeeded } from '@/lib/store/slices/groupSlice';
+import { setFilter, setSort } from '@/lib/store/slices/deckSlice';
 import { AnyAction } from '@reduxjs/toolkit';
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const dispatch = useDispatch<AppDispatch>();
-  const {
-    decks: reduxDecks,
-    isLoading: decksLoading,
-    filter: reduxFilter,
-    sort: reduxSort,
-    lastFetched: decksLastFetched,
-  } = useSelector((state: RootState) => state.deck);
-  const { groups: reduxGroups, lastFetched: groupsLastFetched } = useSelector(
-    (state: RootState) => state.group,
+  const { filter: reduxFilter, sort: reduxSort } = useSelector(
+    (state: RootState) => state.deck,
   );
-  const [selectedGroup, setSelectedGroup] = useState<string>('all');
-  const [newGroupName, setNewGroupName] = useState<string>('');
-  const [showGroupInput, setShowGroupInput] = useState<boolean>(false);
   const [groupMode, setGroupMode] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!session?.user?.id) return;
-
-    // データが存在しない場合のみフェッチ
-    if (!reduxDecks.length || !reduxGroups.length) {
-      dispatch(fetchDecksIfNeeded() as unknown as AnyAction);
-      dispatch(fetchGroupsIfNeeded() as unknown as AnyAction);
-    }
-  }, [session?.user?.id, dispatch, reduxDecks.length, reduxGroups.length]);
-
-  // フィルタリングとソートの適用
-  const filteredAndSortedDecks = useMemo(() => {
-    const filtered =
-      selectedGroup === 'all'
-        ? reduxDecks
-        : reduxDecks.filter((d) =>
-            d.groups?.some((g) => g.id === selectedGroup),
-          );
-
-    return [...filtered]
-      .filter((deck) => {
-        if (reduxFilter === 'all') return true;
-        if (reduxFilter === 'inProgress')
-          return deck.progress && deck.progress > 0 && deck.progress < 1;
-        if (reduxFilter === 'completed') return deck.progress === 1;
-        if (reduxFilter === 'notStarted')
-          return !deck.progress || deck.progress === 0;
-        return true;
-      })
-      .sort((a, b) => {
-        if (reduxSort === 'recent') {
-          const bTime = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
-          const aTime = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
-          return bTime - aTime;
-        }
-        if (reduxSort === 'alphabetical') {
-          return a.title.localeCompare(b.title);
-        }
-        if (reduxSort === 'cardCount') {
-          return b.cardCount - a.cardCount;
-        }
-        return 0;
-      });
-  }, [reduxDecks, selectedGroup, reduxFilter, reduxSort]);
 
   return (
     <DashboardShell groupMode={groupMode} setGroupMode={setGroupMode}>
@@ -116,28 +50,10 @@ export default function DashboardPage() {
 
         <div className="py-4 pl-4 pr-8 flex lg:flex-row gap-5">
           <div className="w-4/5 lg:w-10/12">
-            <DeckList
-              decks={filteredAndSortedDecks}
-              groupMode={groupMode}
-              groups={reduxGroups}
-              setDecks={(decks: DeckWithCardsAndGroups[]) =>
-                dispatch(setDecks(decks))
-              }
-            />
+            <DeckList groupMode={groupMode} />
           </div>
           <div className="w-1/5 lg:w-2/12">
-            <Sidebar
-              groups={reduxGroups as Group[]}
-              setGroups={(groups) =>
-                dispatch(setGroups(groups as Group[]) as unknown as AnyAction)
-              }
-              selectedGroup={selectedGroup}
-              setSelectedGroup={setSelectedGroup}
-              newGroupName={newGroupName}
-              setNewGroupName={setNewGroupName}
-              showGroupInput={showGroupInput}
-              setShowGroupInput={setShowGroupInput}
-            />
+            <Sidebar />
           </div>
         </div>
       </div>
