@@ -1,6 +1,6 @@
 // components/share/ShareModal.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { DeckCard } from './DeckCard';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -8,27 +8,11 @@ import { Sparkles, Trash2 } from 'lucide-react';
 import { ImportDeckButton } from '../deck/ImportDeckButton';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
-// import { Subscription } from '@prisma/client'; // ここは削除またはコメントアウト
-import { setSubscription } from '@/lib/store/slices/userSlice';
 import { Button } from '../ui/button';
-import { setDecks } from '@/lib/store/slices/deckSlice';
 import {
   setImportedDecks,
   removeImportedDeck,
 } from '@/lib/store/slices/importedDeckSlice';
-
-// userSlice.ts から直接型をインポートすることを強く推奨します
-// これにより、型の重複定義と不一致を防げます
-import { Subscription as ReduxSubscriptionType } from '@/lib/store/slices/userSlice';
-
-interface Deck {
-  id: string;
-  title: string;
-  description?: string | null;
-  cardCount: number;
-  groups?: { name: string }[];
-  shareCode?: string | null;
-}
 
 interface ShareModalProps {
   open: boolean;
@@ -36,7 +20,6 @@ interface ShareModalProps {
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
-  const [loading, setLoading] = useState(false);
   const [importCode, setImportCode] = useState('');
   const [importing, setImporting] = useState(false);
   const [importLoading, setImportLoading] = useState<string | null>(null);
@@ -50,42 +33,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
   const importedDecks = useSelector(
     (state: RootState) => state.importedDeck.decks,
   );
-
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    fetch('/api/decks')
-      .then((res) => res.json())
-      .then((data) => {
-        dispatch(setDecks(data));
-        setLoading(false);
-      })
-      .catch(() => {
-        toast.error('暗記帳の取得に失敗しました');
-        setLoading(false);
-      });
-    setImportCode('');
-
-    const fetchSubscription = async () => {
-      try {
-        const subscriptionResponse = await fetch('/api/subscription/status');
-        if (!subscriptionResponse.ok) {
-          throw new Error('サブスクリプション情報の取得に失敗しました');
-        }
-
-        // ここで ReduxSubscriptionType を使用
-        const subscriptionData: ReduxSubscriptionType =
-          await subscriptionResponse.json();
-
-        // Reduxの状態を更新
-        dispatch(setSubscription(subscriptionData));
-      } catch (error) {
-        console.error('サブスクリプション情報の取得に失敗しました:', error);
-      }
-    };
-
-    fetchSubscription();
-  }, [open, dispatch]);
 
   const handleImport = async () => {
     if (!importCode.trim()) {
@@ -144,11 +91,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ open, onClose }) => {
           <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4 text-foreground">
             自分の暗記帳一覧
           </h2>
-          {loading ? (
-            <div className="text-muted-foreground py-8 text-center">
-              読み込み中...
-            </div>
-          ) : decks.length === 0 ? (
+          {decks.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center">
               暗記帳がありません
             </div>
