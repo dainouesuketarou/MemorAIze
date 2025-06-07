@@ -21,7 +21,7 @@ export default function CreatePage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const { limit, loading: limitLoading } = useAiGenerationLimit();
+  const { limit, isLoading } = useAiGenerationLimit();
   const subscription = useSelector(
     (state: RootState) => state.user.subscription,
   );
@@ -88,7 +88,7 @@ export default function CreatePage() {
   const isProUser =
     subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';
   const isAiGenerationDisabled =
-    !isProUser && limit !== null && limit.count >= limit.limit;
+    !isProUser && limit !== null && limit.monthlyUsage >= limit.monthlyLimit;
 
   if (!session?.user?.id) {
     return (
@@ -149,7 +149,8 @@ export default function CreatePage() {
                       AI生成回数の上限に達しました
                     </p>
                     <p className="text-muted-foreground">
-                      今月のAI生成回数（{limit.count}/{limit.limit}
+                      今月のAI生成回数（{limit.monthlyUsage}/
+                      {limit.monthlyLimit}
                       回）の上限に達しました。
                       Proプランにアップグレードすると、無制限にAI機能をご利用いただけます。
                     </p>
