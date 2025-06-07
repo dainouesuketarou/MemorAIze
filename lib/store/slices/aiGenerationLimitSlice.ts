@@ -25,9 +25,7 @@ const aiGenerationLimitSlice = createSlice({
       action: PayloadAction<UpdateAiGenerationLimitParams>,
     ) => {
       if (state.limit) {
-        console.log('updateUsage', action.payload);
-        console.log('state.limit', state.limit);
-        state.limit.monthlyUsage = action.payload.monthlyUsage;
+        state.limit.monthlyUsage = (state.limit.monthlyUsage || 0) + 1;
       }
     },
     resetMonthlyLimit: (state) => {

@@ -29,6 +29,8 @@ import { PreviewCard } from './ai-generate-form';
 import { PreviewCards } from './preview-cards';
 import { cn } from '@/lib/utils';
 import { Group } from '@prisma/client';
+import { useDispatch } from 'react-redux';
+import { updateUsage } from '@/lib/store/slices/aiGenerationLimitSlice';
 
 const formSchema = z.object({
   content: z
@@ -58,6 +60,7 @@ export function CardAddAiForm({ deckId, groups, onSuccess }: Props) {
     cards: PreviewCard[];
   } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const dispatch = useDispatch();
 
   useEffect(() => {
     if (groups.length > 0) {
@@ -168,6 +171,9 @@ export function CardAddAiForm({ deckId, groups, onSuccess }: Props) {
           'タイトル、学習内容テキスト、またはファイルアップロードのいずれかを入力してください',
         );
       }
+
+      // AI機能使用前にlimitを更新
+      dispatch(updateUsage({ monthlyUsage: 1 }));
 
       let content = values.content;
 

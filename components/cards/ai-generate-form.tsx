@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { useDispatch } from 'react-redux';
 import { addDeck } from '@/lib/store/slices/deckSlice';
 import { AppDispatch } from '@/lib/store/store';
+import { updateUsage } from '@/lib/store/slices/aiGenerationLimitSlice';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,6 +103,9 @@ export function AiGenerateForm({ groups }: AiGenerateFormProps) {
           'タイトル、学習内容テキスト、またはファイルアップロードのいずれかを入力してください',
         );
       }
+
+      // AI機能使用前にlimitを更新
+      dispatch(updateUsage({ monthlyUsage: 1 }));
 
       /* ---------- API へ投げるペイロードを作成 ---------- */
       const payload = { ...values };

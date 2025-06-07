@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { updateUsage } from '@/lib/store/slices/aiGenerationLimitSlice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -10,6 +12,7 @@ import {
   AlertCircle,
   RefreshCw,
   LoaderCircle,
+  Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -69,6 +72,8 @@ export function PreviewCards({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [additionalInstructions, setAdditionalInstructions] = useState('');
 
+  const dispatch = useDispatch();
+
   useEffect(() => {
     if (JSON.stringify(initialCards) !== JSON.stringify(cards)) {
       setCards(initialCards);
@@ -113,6 +118,8 @@ export function PreviewCards({
     if (!onRegenerate) return;
     setIsRegenerating(true);
     try {
+      dispatch(updateUsage({ monthlyUsage: 1 }));
+
       const response = await fetch('/api/cards/refresh', {
         method: 'POST',
         headers: {
@@ -161,15 +168,20 @@ export function PreviewCards({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 {/* 選択されたグループの表示 */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    選択された分野:
-                  </span>
+                <div className="flex items-center gap-3 bg-muted/50 px-4 py-2 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">選択された分野</span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {groups
                       .filter((group) => selectedGroupIds.includes(group.id))
                       .map((group) => (
-                        <Badge key={group.id} variant="secondary">
+                        <Badge
+                          key={group.id}
+                          variant="secondary"
+                          className="bg-background hover:bg-background/80 transition-colors"
+                        >
                           {group.name}
                         </Badge>
                       ))}
