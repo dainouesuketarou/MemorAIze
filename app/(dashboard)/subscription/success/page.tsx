@@ -10,12 +10,16 @@ import { useDispatch } from 'react-redux';
 import { setSubscription } from '@/lib/store/slices/userSlice';
 import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 
+// userSlice.ts の Subscription インターフェースと一致させる
 interface Subscription {
   status: SubscriptionStatus;
   plan: SubscriptionPlan;
   stripeSubscriptionId: string | null;
   stripePriceId: string | null;
-  stripeCurrentPeriodEnd: Date | null;
+  // ここを Date | null から string | null に変更
+  stripeCurrentPeriodEnd: string | null;
+  // 必要に応じて他のプロパティも追加
+  cancelAtPeriodEnd?: boolean;
 }
 
 export default function SubscriptionSuccessPage() {
@@ -37,9 +41,11 @@ export default function SubscriptionSuccessPage() {
         if (!paymentIntent || !paymentIntentClientSecret) {
           setIsSuccess(false);
           toast.error('支払い情報が見つかりません');
+          setIsVerifying(false); // エラーの場合も検証を終了
           return;
         }
 
+        // ★ verify エンドポイントへの呼び出し
         const response = await fetch('/api/subscription/verify', {
           method: 'POST',
           headers: {
@@ -53,20 +59,28 @@ export default function SubscriptionSuccessPage() {
         });
 
         if (!response.ok) {
-          const error = await response.text();
-          throw new Error(error || '支払いの確認に失敗しました');
+          const errorText = await response.text(); // text() を使ってエラーメッセージを取得
+          let errorMessage = '支払いの確認に失敗しました';
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorMessage;
+          } catch {
+            errorMessage = errorText || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
 
-        // サブスクリプション情報を取得
+        // verify エンドポイントが成功したと判断されたら、
+        // /api/subscription/status から最新のサブスクリプション情報を取得
         const subscriptionResponse = await fetch('/api/subscription/status');
         if (!subscriptionResponse.ok) {
           throw new Error('サブスクリプション情報の取得に失敗しました');
         }
 
-        const subscriptionData: Subscription =
+        const subscriptionData: Subscription = // 型を一致させる
           await subscriptionResponse.json();
 
-        // Reduxの状態を更新
+        // Reduxの状態を更新 - ここでの更新は「最終確認」としての更新
         dispatch(setSubscription(subscriptionData));
 
         setIsSuccess(true);
@@ -83,7 +97,7 @@ export default function SubscriptionSuccessPage() {
     };
 
     verifyPayment();
-  }, [searchParams, dispatch]);
+  }, [searchParams, dispatch]); // dispatch を依存配列に含める
 
   const handleBackToDashboard = () => {
     router.push('/dashboard');

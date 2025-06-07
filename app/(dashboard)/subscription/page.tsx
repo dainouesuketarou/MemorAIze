@@ -446,29 +446,29 @@ export default function SubscriptionPage() {
                           'サブスクリプションが正常に更新されました！',
                         );
                         // Reduxのstateを即座に更新したい場合 (Webhookからの最終更新を待つ前にUIを早く更新)
-                        if (verifiedData.subscription) {
-                          dispatch(
-                            setSubscription({
-                              status: 'ACTIVE', // 支払い成功なのでACTIVEに設定
-                              plan: verifiedData.subscription.plan,
-                              stripeSubscriptionId:
-                                verifiedData.subscription.stripeSubscriptionId,
-                              stripePriceId:
-                                verifiedData.subscription.stripePriceId,
-                              stripeCurrentPeriodEnd: verifiedData.subscription
-                                .stripeCurrentPeriodEnd
-                                ? new Date(
-                                    verifiedData.subscription
-                                      .stripeCurrentPeriodEnd * 1000,
-                                  ).toISOString()
-                                : null, // StripeのタイムスタンプをDate文字列に変換
-                            }),
-                          );
-                        }
+                        // if (verifiedData.subscription) {
+                        //   dispatch(
+                        //     setSubscription({
+                        //       status: 'ACTIVE', // 支払い成功なのでACTIVEに設定
+                        //       plan: verifiedData.subscription.plan,
+                        //       stripeSubscriptionId:
+                        //         verifiedData.subscription.stripeSubscriptionId,
+                        //       stripePriceId:
+                        //         verifiedData.subscription.stripePriceId,
+                        //       stripeCurrentPeriodEnd: verifiedData.subscription
+                        //         .stripeCurrentPeriodEnd
+                        //         ? new Date(
+                        //             verifiedData.subscription
+                        //               .stripeCurrentPeriodEnd * 1000,
+                        //           ).toISOString()
+                        //         : null, // StripeのタイムスタンプをDate文字列に変換
+                        //     }),
+                        //   );
+                        // }
                         setClientSecret(null);
                         setSelectedPlanId(null);
                         // router.refresh() はサーバーから最新データをフェッチするため、Webhookからの更新を待つ場合も有効
-                        router.refresh();
+                        // router.refresh();
                       } else {
                         toast.error(
                           verifiedData.message || '支払いの検証に失敗しました',
