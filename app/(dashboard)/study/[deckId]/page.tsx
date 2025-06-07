@@ -17,7 +17,11 @@ import {
   saveProgress,
   clearProgress,
 } from '@/lib/store/slices/studyProgressSlice';
-import { updateDeckProgress } from '@/lib/store/slices/deckSlice';
+import {
+  updateDeckProgress,
+  fetchDeckDetailsIfNeeded,
+  updateDeck,
+} from '@/lib/store/slices/deckSlice';
 import { AnyAction } from '@reduxjs/toolkit';
 import { MathRenderer } from '@/components/common/MathRenderer';
 import { MathText } from '@/components/common/MathText';
@@ -265,7 +269,7 @@ export default function StudyPage() {
       }
 
       try {
-        // 学習結果を保存
+        // 1. 学習結果をデータベースに保存
         const resultResponse = await fetch(`/api/study/${deckId}/result`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -276,8 +280,7 @@ export default function StudyPage() {
           throw new Error('学習結果の保存に失敗しました');
         }
 
-        // 学習履歴を保存
-        // 正解したカードの割合を計算
+        // 2. 学習履歴をデータベースに保存
         const correctCount = finalResults.filter((r) => r.mastered).length;
         const progressPercentage = Math.round(
           (correctCount / totalCards) * 100,
@@ -299,19 +302,49 @@ export default function StudyPage() {
           throw new Error('学習履歴の保存に失敗しました');
         }
 
-        // Reduxの状態を更新
+        // 3. Reduxの状態を更新
+        // 3.1 デッキの進捗を更新
         dispatch(
           updateDeckProgress({
             deckId: deckId as string,
             progress: progressPercentage,
-          }) as unknown as AnyAction,
+          }),
         );
+
+        // 3.2 学習進捗をクリア
         dispatch(clearProgress(deckId as string));
 
-        // 少し待ってからリダイレクト（ローディング表示のため）
-        setTimeout(() => {
-          router.push(`/deck/${deckId}`);
-        }, 1000);
+        // 3.3 カードの状態を更新
+        finalResults.forEach((result) => {
+          dispatch(
+            updateCardStatus({
+              cardId: result.id,
+              status: result.mastered ? 'MASTERED' : 'STRUGGLING',
+            }),
+          );
+        });
+
+        // 4. データベースから最新のデータをフェッチ
+        const deckResponse = await fetch(`/api/decks/${deckId}`);
+        if (!deckResponse.ok) {
+          throw new Error('デッキデータの取得に失敗しました');
+        }
+        const deckData = await deckResponse.json();
+
+        // 5. フェッチしたデータでReduxの状態を更新
+        dispatch(
+          updateDeck({
+            ...deckData,
+            cards: deckData.cards || [],
+            lastStudied: deckData.lastStudied
+              ? String(deckData.lastStudied)
+              : null,
+            groups: deckData.groups || [],
+          }),
+        );
+
+        // 6. ページ遷移
+        router.push(`/deck/${deckId}`);
       } catch (error) {
         console.error('学習データの保存に失敗しました:', error);
         toast.error('学習データの保存に失敗しました');

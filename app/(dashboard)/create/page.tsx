@@ -12,20 +12,24 @@ import { Group, Subscription } from '@prisma/client';
 import { useSession } from 'next-auth/react';
 import { useAiGenerationLimit } from '@/hooks/use-ai-generation-limit';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '@/lib/store/store';
+import { RootState, AppDispatch } from '@/lib/store/store';
 import { toast } from 'sonner';
 import { HeaderNav } from '@/components/dashboard/header-nav';
+import { fetchGroupsIfNeeded } from '@/lib/store/slices/groupSlice';
+import { useSubscription } from '@/hooks/use-subscription';
 
 export default function CreatePage() {
   const { data: session } = useSession();
-  const [groups, setGroups] = useState<Group[]>([]);
   const [groupMode, setGroupMode] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const { limit, isLoading } = useAiGenerationLimit();
-  const subscription = useSelector(
-    (state: RootState) => state.user.subscription,
+  const { limit, isLoading: isLimitLoading } = useAiGenerationLimit();
+  const dispatch = useDispatch<AppDispatch>();
+
+  // Reduxの状態を取得
+  const { groups, isLoading: isGroupsLoading } = useSelector(
+    (state: RootState) => state.group,
   );
-  const dispatch = useDispatch();
+  const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
 
   // スクロールイベントの最適化
   useEffect(() => {
@@ -43,74 +47,11 @@ export default function CreatePage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // グループの取得
+  // グループの取得（Reduxの状態が空の場合のみ）
   useEffect(() => {
-    if (!session?.user?.id) return;
-
-    const fetchGroups = async () => {
-      try {
-        const response = await fetch(`/api/groups`);
-        if (!response.ok) throw new Error('グループの取得に失敗しました');
-        const data = await response.json();
-        setGroups(data);
-      } catch (error) {
-        console.error('グループ取得エラー:', error);
-        toast.error('グループの取得に失敗しました');
-      }
-    };
-
-    fetchGroups();
-  }, [session?.user?.id]);
-
-  // サブスクリプション情報の取得
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      let retryCount = 0;
-      const maxRetries = 3;
-      const retryDelay = 1000; // 1秒
-
-      const attemptFetch = async () => {
-        try {
-          const subscriptionResponse = await fetch('/api/subscription/status', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            cache: 'no-store',
-          });
-
-          if (!subscriptionResponse.ok) {
-            throw new Error(
-              `HTTP error! status: ${subscriptionResponse.status}`,
-            );
-          }
-
-          const subscriptionData: Subscription =
-            await subscriptionResponse.json();
-          dispatch({
-            type: 'user/setSubscription',
-            payload: subscriptionData,
-          });
-        } catch (error) {
-          console.error('サブスクリプション情報の取得に失敗しました:', error);
-
-          if (retryCount < maxRetries) {
-            retryCount++;
-            console.log(`リトライ ${retryCount}/${maxRetries}...`);
-            setTimeout(attemptFetch, retryDelay * retryCount);
-          } else {
-            toast.error(
-              'サブスクリプション情報の取得に失敗しました。後でもう一度お試しください。',
-            );
-          }
-        }
-      };
-
-      attemptFetch();
-    };
-
-    fetchSubscription();
-  }, [dispatch]);
+    if (!session?.user?.id || groups.length > 0) return;
+    dispatch(fetchGroupsIfNeeded());
+  }, [session?.user?.id, groups.length, dispatch]);
 
   const isProUser =
     subscription?.plan === 'PRO_MONTHLY' || subscription?.plan === 'PRO_YEARLY';

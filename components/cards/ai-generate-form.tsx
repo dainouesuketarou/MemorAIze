@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useDispatch } from 'react-redux';
 import { addDeck } from '@/lib/store/slices/deckSlice';
-import { updateUsage } from '@/lib/store/slices/aiGenerationLimitSlice';
+import { AppDispatch } from '@/lib/store/store';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +64,7 @@ const formSchema = z.object({
 /* ===================================================================== */
 export function AiGenerateForm({ groups }: AiGenerateFormProps) {
   const router = useRouter();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
@@ -136,50 +136,21 @@ export function AiGenerateForm({ groups }: AiGenerateFormProps) {
         throw new Error(json.error || '暗記カードの生成に失敗しました');
       }
 
-      // デッキを作成
-      const deckResponse = await fetch('/api/decks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: json.data.title,
-          cards: json.data.cards,
-        }),
-      });
-
-      if (!deckResponse.ok) {
-        throw new Error('暗記帳の作成に失敗しました');
-      }
-
-      const deckData = await deckResponse.json();
-
       /* ---------- 正常時: state 更新 ---------- */
       setTitle(json.data.title);
       setCards(json.data.cards);
       setLastPayload(payload);
-
-      // ReduxのStateを更新
-      if (deckData) {
-        dispatch(addDeck(deckData));
-      }
-
-      // AI生成制限の更新
-      const aiLimitHeader = res.headers.get('X-Update-AI-Limit');
-      if (aiLimitHeader) {
-        const aiLimit = JSON.parse(aiLimitHeader);
-        dispatch(updateUsage({ monthlyUsage: aiLimit.monthlyUsage }));
-      }
-
       toast({
         title: '暗記カードを生成しました',
         description: 'プレビュー画面で編集できます。',
       });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : '予期せぬエラーが発生しました';
-      setError(errorMessage);
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : '予期せぬエラーが発生しました';
+      setError(msg);
       toast({
         title: 'エラーが発生しました',
-        description: errorMessage,
+        description: msg,
         variant: 'destructive',
       });
     } finally {
@@ -217,6 +188,12 @@ export function AiGenerateForm({ groups }: AiGenerateFormProps) {
       const json = await res.json();
       if (!res.ok || !json.success)
         throw new Error(json.error || 'デッキの保存に失敗しました');
+
+      // Reduxストアを更新
+      if (json.data) {
+        dispatch(addDeck(json.data));
+      }
+
       router.push('/dashboard');
     } catch (e) {
       const msg =

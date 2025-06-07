@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useDispatch } from 'react-redux';
 import { addDeck } from '@/lib/store/slices/deckSlice';
+import { AppDispatch } from '@/lib/store/store';
 
 // Form schema for the deck
 const deckFormSchema = z.object({
@@ -69,7 +70,7 @@ interface ManualCreateFormProps {
 
 export function ManualCreateForm({ groups }: ManualCreateFormProps) {
   const router = useRouter();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const [cards, setCards] = useState<CardType[]>([
     { id: '1', front: '', back: '', isNew: true },
   ]);
@@ -193,34 +194,73 @@ export function ManualCreateForm({ groups }: ManualCreateFormProps) {
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof deckFormSchema>) => {
+  const onSubmit = async (deckValues: z.infer<typeof deckFormSchema>) => {
+    // Save the current card before submitting
+    const { front, back } = cardForm.getValues();
+    if (front && back) {
+      setCards((prevCards) =>
+        prevCards.map((card) =>
+          card.id === currentCardId
+            ? { ...card, front, back, isNew: false }
+            : card,
+        ),
+      );
+    }
+
+    const validCards = cards.filter((card) => card.front && card.back);
+    if (validCards.length === 0) {
+      toast.error('少なくとも1枚のカードを作成してください');
+      return;
+    }
+
+    if (selectedGroupIds.length === 0) {
+      toast.error('少なくとも1つの分野を選択してください');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch('/api/decks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: values.title,
-          description: values.description,
-          cards: cards.map(({ front, back }) => ({ front, back })),
+          title: deckValues.title,
+          description: deckValues.description,
+          groupIds: selectedGroupIds,
+          cardCount: validCards.length,
+          progress: 0,
+          lastStudied: null,
+          cards: validCards.map((card) => ({
+            front: card.front,
+            back: card.back,
+          })),
         }),
       });
-
       if (!res.ok) {
-        throw new Error('暗記帳の作成に失敗しました');
+        const errorData = await res.json();
+        console.error('APIエラー:', errorData);
+        toast.error(
+          '保存に失敗しました: ' +
+            (errorData.detail || errorData.error || '不明なエラー'),
+        );
+        setIsLoading(false);
+        return;
       }
 
-      const data = await res.json();
+      const json = await res.json();
+      // Reduxストアを更新
+      if (json.data) {
+        dispatch(addDeck(json.data));
+      }
 
-      // ReduxのStateを更新
-      dispatch(addDeck(data));
-
-      toast.success('暗記帳を作成しました');
-      router.push('/dashboard');
-    } catch (error) {
-      toast.error('暗記帳の作成に失敗しました');
-    } finally {
       setIsLoading(false);
+      router.push('/dashboard');
+    } catch (e) {
+      setIsLoading(false);
+      console.error('通信エラー:', e);
+      toast.error(
+        '保存に失敗しました: ' + (e instanceof Error ? e.message : String(e)),
+      );
     }
   };
 

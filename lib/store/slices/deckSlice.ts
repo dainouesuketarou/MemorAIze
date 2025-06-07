@@ -191,6 +191,16 @@ const deckSlice = createSlice({
       .addCase(fetchDeckDetailsIfNeeded.fulfilled, (state, action) => {
         if (action.payload) {
           state.selectedDeck = action.payload;
+
+          const index = state.decks.findIndex(
+            (deck) => deck.id === action.payload.id,
+          );
+          if (index !== -1) {
+            state.decks[index] = action.payload;
+          } else {
+            state.decks.push(action.payload);
+          }
+
           state.lastFetched = Date.now();
         }
         state.isLoading = false;

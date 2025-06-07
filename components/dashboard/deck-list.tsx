@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Deck, Group } from '@prisma/client';
 import {
   Card,
@@ -43,15 +43,20 @@ import { AnyAction } from '@reduxjs/toolkit';
 import { DeckWithCardsAndGroups } from '@/types/deck';
 
 interface DeckListProps {
+  decks: DeckWithCardsAndGroups[];
   groupMode: boolean;
+  groups: Group[];
+  setDecks: (decks: DeckWithCardsAndGroups[]) => void;
 }
 
-export function DeckList({ groupMode }: DeckListProps) {
+export function DeckList({
+  decks,
+  groupMode,
+  groups,
+  setDecks,
+}: DeckListProps) {
   const dispatch = useDispatch();
-  const { decks, isLoading, filter, sort } = useSelector(
-    (state: RootState) => state.deck,
-  );
-  const { groups } = useSelector((state: RootState) => state.group);
+  const { isLoading } = useSelector((state: RootState) => state.deck);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDeck, setSelectedDeck] =
     useState<DeckWithCardsAndGroups | null>(null);
@@ -60,69 +65,6 @@ export function DeckList({ groupMode }: DeckListProps) {
     useState<DeckWithCardsAndGroups | null>(null);
   const router = useRouter();
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-
-  // デッキデータの取得
-  useEffect(() => {
-    const fetchDecks = async () => {
-      if (!decks?.length) {
-        dispatch(setLoading(true) as unknown as AnyAction);
-        try {
-          const response = await fetch('/api/decks');
-          if (!response.ok) {
-            throw new Error('デッキの取得に失敗しました');
-          }
-          const data = await response.json();
-          dispatch(setDecks(data) as unknown as AnyAction);
-        } catch (error) {
-          console.error('デッキ取得エラー:', error);
-          dispatch(
-            setError(
-              error instanceof Error
-                ? error.message
-                : 'デッキの取得に失敗しました',
-            ) as unknown as AnyAction,
-          );
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : 'デッキの取得に失敗しました',
-          );
-        } finally {
-          dispatch(setLoading(false) as unknown as AnyAction);
-        }
-      }
-    };
-
-    fetchDecks();
-  }, [decks, dispatch]);
-
-  // フィルタリングとソートの適用
-  const filteredAndSortedDecks = useMemo(() => {
-    return [...decks]
-      .filter((deck) => {
-        if (filter === 'all') return true;
-        if (filter === 'inProgress')
-          return deck.progress && deck.progress > 0 && deck.progress < 1;
-        if (filter === 'completed') return deck.progress === 1;
-        if (filter === 'notStarted')
-          return !deck.progress || deck.progress === 0;
-        return true;
-      })
-      .sort((a, b) => {
-        if (sort === 'recent') {
-          const bTime = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
-          const aTime = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
-          return bTime - aTime;
-        }
-        if (sort === 'alphabetical') {
-          return a.title.localeCompare(b.title);
-        }
-        if (sort === 'cardCount') {
-          return b.cardCount - a.cardCount;
-        }
-        return 0;
-      });
-  }, [decks, filter, sort]);
 
   // モーダルを開く時に選択状態を初期化
   useEffect(() => {
@@ -165,11 +107,7 @@ export function DeckList({ groupMode }: DeckListProps) {
 
       const updatedDecks = await decksRes.json();
       dispatch(setDecks(updatedDecks) as unknown as AnyAction);
-      setSelectedDeck(
-        updatedDecks.find(
-          (d: DeckWithCardsAndGroups) => d.id === selectedDeck.id,
-        ),
-      );
+      setDecks(updatedDecks);
       toast.success('グループを更新しました');
       setModalOpen(false);
     } catch (error) {
@@ -205,7 +143,7 @@ export function DeckList({ groupMode }: DeckListProps) {
       // 削除成功後、デッキリストを更新
       const updatedDecks = decks.filter((deck) => deck.id !== deckToDelete.id);
       dispatch(setDecks(updatedDecks) as unknown as AnyAction);
-      setSelectedDeck(null);
+      setDecks(updatedDecks);
 
       toast.success('暗記帳を削除しました');
       setDeleteModalOpen(false);
@@ -231,10 +169,18 @@ export function DeckList({ groupMode }: DeckListProps) {
     return `${Math.floor(days / 30)}ヶ月前`;
   };
 
+  // モーダル内デッキ更新時に選択中デッキも同期
+  useEffect(() => {
+    if (selectedDeck) {
+      const updated = decks.find((d) => d.id === selectedDeck.id);
+      if (updated) setSelectedDeck(updated);
+    }
+  }, [decks, selectedDeck]);
+
   return (
     <>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredAndSortedDecks?.map((deck) => (
+        {decks.map((deck) => (
           <Card
             key={deck.id}
             className={cn(
