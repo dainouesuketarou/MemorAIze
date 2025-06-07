@@ -121,7 +121,7 @@ function CheckoutForm({
         throw new Error(error.message);
       }
 
-      onSuccess();
+      onSuccess(); // 支払いが成功した場合にonSuccessを呼び出す
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'エラーが発生しました',
@@ -415,10 +415,72 @@ export default function SubscriptionPage() {
               >
                 <CheckoutForm
                   planId={selectedPlanId}
-                  onSuccess={() => {
-                    setClientSecret(null);
-                    setSelectedPlanId(null);
-                    router.refresh();
+                  onSuccess={async () => {
+                    // 支払い確定後、Stripeのverifyエンドポイントを呼び出す
+                    try {
+                      const response = await fetch('/api/subscription/verify', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          // clientSecretからPaymentIntent IDを抽出
+                          paymentIntent: clientSecret
+                            ? clientSecret.split('_secret_')[0]
+                            : null,
+                          paymentIntentClientSecret: clientSecret,
+                          redirectStatus: 'succeeded', // PaymentElementで確認済みとして渡す
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(
+                          errorData.message || '支払いの検証に失敗しました',
+                        );
+                      }
+
+                      const verifiedData = await response.json();
+                      if (verifiedData.status === 'success') {
+                        toast.success(
+                          'サブスクリプションが正常に更新されました！',
+                        );
+                        // Reduxのstateを即座に更新したい場合 (Webhookからの最終更新を待つ前にUIを早く更新)
+                        if (verifiedData.subscription) {
+                          dispatch(
+                            setSubscription({
+                              status: 'ACTIVE', // 支払い成功なのでACTIVEに設定
+                              plan: verifiedData.subscription.plan,
+                              stripeSubscriptionId:
+                                verifiedData.subscription.stripeSubscriptionId,
+                              stripePriceId:
+                                verifiedData.subscription.stripePriceId,
+                              stripeCurrentPeriodEnd: verifiedData.subscription
+                                .stripeCurrentPeriodEnd
+                                ? new Date(
+                                    verifiedData.subscription
+                                      .stripeCurrentPeriodEnd * 1000,
+                                  ).toISOString()
+                                : null, // StripeのタイムスタンプをDate文字列に変換
+                            }),
+                          );
+                        }
+                        setClientSecret(null);
+                        setSelectedPlanId(null);
+                        // router.refresh() はサーバーから最新データをフェッチするため、Webhookからの更新を待つ場合も有効
+                        router.refresh();
+                      } else {
+                        toast.error(
+                          verifiedData.message || '支払いの検証に失敗しました',
+                        );
+                      }
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : '支払いの検証中にエラーが発生しました',
+                      );
+                    }
                   }}
                 />
               </Elements>
