@@ -136,14 +136,38 @@ export function AiGenerateForm({ groups }: AiGenerateFormProps) {
         throw new Error(json.error || '暗記カードの生成に失敗しました');
       }
 
+      // デッキを作成
+      const deckResponse = await fetch('/api/decks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: json.data.title,
+          cards: json.data.cards,
+        }),
+      });
+
+      if (!deckResponse.ok) {
+        throw new Error('暗記帳の作成に失敗しました');
+      }
+
+      const deckData = await deckResponse.json();
+
       /* ---------- 正常時: state 更新 ---------- */
       setTitle(json.data.title);
       setCards(json.data.cards);
       setLastPayload(payload);
 
       // ReduxのStateを更新
-      dispatch(addDeck(json.data.deck));
-      dispatch(updateUsage({ monthlyUsage: json.data.remainingGenerations }));
+      if (deckData) {
+        dispatch(addDeck(deckData));
+      }
+
+      // AI生成制限の更新
+      const aiLimitHeader = res.headers.get('X-Update-AI-Limit');
+      if (aiLimitHeader) {
+        const aiLimit = JSON.parse(aiLimitHeader);
+        dispatch(updateUsage({ monthlyUsage: aiLimit.monthlyUsage }));
+      }
 
       toast({
         title: '暗記カードを生成しました',
