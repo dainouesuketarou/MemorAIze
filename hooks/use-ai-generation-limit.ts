@@ -22,14 +22,7 @@ export function useAiGenerationLimit() {
         const data = await response.json();
 
         if (data.success) {
-          const limitData: AiGenerationLimit = {
-            id: data.data.id,
-            userId: data.data.userId,
-            monthlyLimit: data.data.limit,
-            monthlyUsage: data.data.count,
-            lastResetMonth: new Date(data.data.resetAt),
-          };
-          dispatch(setLimit(limitData));
+          dispatch(setLimit(data.limit));
         } else {
           dispatch(setError(data.error || 'AI生成制限の取得に失敗しました'));
         }

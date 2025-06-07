@@ -149,8 +149,8 @@ export default function CreatePage() {
                       AI生成回数の上限に達しました
                     </p>
                     <p className="text-muted-foreground">
-                      今月のAI生成回数（{limit.monthlyUsage}/
-                      {limit.monthlyLimit}
+                      今月のAI生成回数（{limit?.monthlyUsage ?? 0}/
+                      {limit?.monthlyLimit ?? 0}
                       回）の上限に達しました。
                       Proプランにアップグレードすると、無制限にAI機能をご利用いただけます。
                     </p>

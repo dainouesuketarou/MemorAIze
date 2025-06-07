@@ -9,15 +9,11 @@ const toIsoJst = (d: Date) =>
     .toISOString()
     .replace('Z', '+09:00');
 
-/* ----- JST 日付取得 ----- */
-const getJstDate = () => {
-  const now = new Date();
-  return new Date(now.getTime() + 9 * 60 * 60 * 1_000);
-};
-
-/* ----- 月初日取得（JST） ----- */
+/* ----- JST 月初日取得 ----- */
 const getJstMonthStart = () => {
-  const jst = getJstDate();
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const jst = new Date(utc + 9 * 3600 * 1000);
   return new Date(jst.getFullYear(), jst.getMonth(), 1);
 };
 
@@ -81,10 +77,12 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      data: {
-        count: aiLimit.count,
-        limit: MONTHLY_LIMIT,
-        resetAt: toIsoJst(resetJst),
+      limit: {
+        id: aiLimit.id,
+        userId: aiLimit.userId,
+        monthlyLimit: MONTHLY_LIMIT,
+        monthlyUsage: aiLimit.count,
+        lastResetMonth: resetJst,
       },
     });
   } catch (error) {
