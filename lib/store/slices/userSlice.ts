@@ -6,7 +6,7 @@ interface Subscription {
   plan: SubscriptionPlan;
   stripeSubscriptionId: string | null;
   stripePriceId: string | null;
-  stripeCurrentPeriodEnd: Date | null;
+  stripeCurrentPeriodEnd: string | null;
 }
 
 interface UserState {
