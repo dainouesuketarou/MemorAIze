@@ -14,8 +14,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { format } from 'date-fns'; // format は使用されていませんが残しておきます
+import { ja } from 'date-fns/locale'; // ja も使用されていませんが残しておきます
 import {
   ChevronLeft,
   Settings,
@@ -36,9 +36,9 @@ import { Loading } from '@/components/loading';
 export default function BillingPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const subscription = useSubscription();
+  const subscription = useSubscription(); // subscription.stripeCurrentPeriodEnd は string | null
   const [isLoading, setIsLoading] = useState(true);
-  const dispatch = useDispatch();
+  const dispatch = useDispatch(); // dispatchはここでは直接使われていないですが、importは残しておきます
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -101,14 +101,39 @@ export default function BillingPage() {
     if (!dateString) return 'なし';
     const date =
       typeof dateString === 'string' ? new Date(dateString) : dateString;
+    // Date-fnsのformatを使う場合は、以下のように変換が必要です
+    // return format(date, 'yyyy年MM月dd日', { locale: ja });
     return date.toLocaleDateString('ja-JP');
   };
 
   const getSubscriptionEndDate = (date: Date | null) => {
     if (!date) return 'なし';
-    const endDate = new Date(date);
+    const endDate = new Date(date); // Dateオブジェクトとして受け取る
     endDate.setDate(endDate.getDate() - 1); // 前日を計算
     return endDate.toLocaleDateString('ja-JP');
+  };
+
+  // subscription?.stripeCurrentPeriodEnd を Dateオブジェクトに変換するヘルパー関数
+  const getPeriodEndAsDate = (
+    dateString: string | null | undefined,
+  ): Date | null => {
+    if (!dateString) return null;
+    try {
+      const date = new Date(dateString);
+      // 無効な日付の場合はnullを返す
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string for conversion:', dateString);
+        return null;
+      }
+      return date;
+    } catch (error) {
+      console.error(
+        'Error converting date string to Date object:',
+        dateString,
+        error,
+      );
+      return null;
+    }
   };
 
   if (isLoading || status === 'loading') {
@@ -177,7 +202,10 @@ export default function BillingPage() {
                   <span className="font-medium">
                     {subscription?.status === 'CANCELED'
                       ? getSubscriptionEndDate(
-                          subscription?.stripeCurrentPeriodEnd,
+                          // ここでDateオブジェクトに変換して渡す
+                          getPeriodEndAsDate(
+                            subscription?.stripeCurrentPeriodEnd,
+                          ),
                         )
                       : formatDate(subscription?.stripeCurrentPeriodEnd)}
                   </span>
