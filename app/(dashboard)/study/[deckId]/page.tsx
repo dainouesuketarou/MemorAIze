@@ -243,7 +243,11 @@ export default function StudyPage() {
     setMasteredCount((p) => Math.min(p + 1, totalCards));
 
     if (currentIndex < totalCards - 1) {
-      next();
+      setShowAnswer(false);
+      // アニメーション完了後に次のカードに移動
+      setTimeout(() => {
+        setCurrentIndex((i) => i + 1);
+      }, 300);
     } else {
       handleNext(true);
     }
@@ -265,7 +269,11 @@ export default function StudyPage() {
     setMasteredCount((p) => Math.max(p - 1, 0));
 
     if (currentIndex < totalCards - 1) {
-      next();
+      setShowAnswer(false);
+      // アニメーション完了後に次のカードに移動
+      setTimeout(() => {
+        setCurrentIndex((i) => i + 1);
+      }, 300);
     } else {
       handleNext(false);
     }
@@ -829,38 +837,31 @@ export default function StudyPage() {
 */
 
 const cardFlipStyles = `
-.study-flip-card {
-  perspective: 1200px;
-}
-.study-flip-inner {
-  transition: transform 0.3s cubic-bezier(0.4,0.2,0.2,1);
-  transform-style: preserve-3d;
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-.study-flip-card.flipped .study-flip-inner {
-  transform: rotateY(180deg);
-}
-.study-flip-front, .study-flip-back {
-  backface-visibility: hidden;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0; left: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.3s ease;
-}
-.study-flip-back {
-  transform: rotateY(180deg);
-}
-.study-flip-card:not(.flipped) .study-flip-back {
-  opacity: 0;
-}
-.study-flip-card.flipped .study-flip-front {
-  opacity: 0;
-}
-`;
+//   .study-flip-card {
+//     perspective: 1200px;
+//   }
+//   .study-flip-inner {
+//     transition: transform 0.5s cubic-bezier(0.4,0.2,0.2,1);
+//     transform-style: preserve-3d;
+//     position: relative;
+//     width: 100%;
+//     height: 100%;
+//   }
+//   .study-flip-card.flipped .study-flip-inner {
+//     transform: rotateY(180deg);
+//   }
+//   .study-flip-front, .study-flip-back {
+//     backface-visibility: hidden;
+//     position: absolute;
+//     width: 100%;
+//     height: 100%;
+//     top: 0; left: 0;
+//     display: flex;
+//     flex-direction: column;
+//     align-items: center;
+//     justify-content: center;
+//   }
+//   .study-flip-back {
+//     transform: rotateY(180deg);
+//   }
+// `;

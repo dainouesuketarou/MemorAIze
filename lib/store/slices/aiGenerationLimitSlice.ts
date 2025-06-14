@@ -15,7 +15,7 @@ const aiGenerationLimitSlice = createSlice({
   name: 'aiGenerationLimit',
   initialState,
   reducers: {
-    setLimit: (state, action: PayloadAction<AiGenerationLimit | null>) => {
+    setLimit: (state, action: PayloadAction<AiGenerationLimit>) => {
       state.limit = action.payload;
       state.isLoading = false;
       state.error = null;
