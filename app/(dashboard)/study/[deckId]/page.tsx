@@ -209,14 +209,20 @@ export default function StudyPage() {
   /* ============ 進む/戻る/判定 ============ */
   const next = () => {
     if (currentIndex < totalCards - 1) {
-      setCurrentIndex((i) => i + 1);
       setShowAnswer(false);
+      // アニメーション完了後にインデックスを更新
+      setTimeout(() => {
+        setCurrentIndex((i) => i + 1);
+      }, 300); // アニメーション時間と同じ
     }
   };
   const prev = () => {
     if (currentIndex > 0) {
-      setCurrentIndex((i) => i - 1);
       setShowAnswer(false);
+      // アニメーション完了後にインデックスを更新
+      setTimeout(() => {
+        setCurrentIndex((i) => i - 1);
+      }, 300); // アニメーション時間と同じ
     }
   };
 
@@ -534,194 +540,56 @@ export default function StudyPage() {
         scrolled={scrolled}
       />
       <main className="flex-1">
-        {/* ヘッダー部分 */}
-        <div className="w-full mb-4 sm:mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{currentIndex + 1}</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-muted-foreground">{totalCards}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setSettingOpen(true)}
-                variant="ghost"
-                size="icon"
-              >
-                <Cog className="h-6 w-6" />
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push('/dashboard')}
-                className="rounded-full px-4 sm:px-6"
-              >
-                終了
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleRestart}
-                className="rounded-full px-4 sm:px-6"
-              >
-                再スタート
-              </Button>
-            </div>
-          </div>
-          <div className="h-2 rounded-full overflow-hidden bg-muted">
-            <div
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* カード部分 */}
-        <style>{cardFlipStyles}</style>
-        <div className="w-full relative">
-          <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr_120px] gap-4 min-h-[400px] sm:h-[500px]">
-            {/* PC表示時の左ボタン */}
-            <Button
-              variant="ghost"
-              className={cn(
-                'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
-                showAnswer
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
-              )}
-              onClick={handleIncorrect}
-            >
-              {showAnswer ? '不正解' : '分からない'}
-            </Button>
-
-            {/* カード本体 */}
-            <div
-              className={cn(
-                'relative flex-1 study-flip-card',
-                showAnswer && 'flipped',
-              )}
-              style={{ minHeight: '300px', height: '100%' }}
-              onClick={() => setShowAnswer((p) => !p)}
-              onTouchStart={(e) => {
-                const touch = e.touches[0];
-                handleDragStart(touch.clientX, touch.clientY);
-              }}
-              onTouchMove={(e) => {
-                const touch = e.touches[0];
-                handleDrag(touch.clientX, touch.clientY);
-              }}
-              onTouchEnd={() => handleDragEnd()}
-              onMouseDown={(e) => {
-                handleDragStart(e.clientX, e.clientY);
-              }}
-              onMouseMove={(e) => {
-                handleDrag(e.clientX, e.clientY);
-              }}
-              onMouseUp={() => handleDragEnd()}
-              onMouseLeave={() => handleDragEnd()}
-            >
-              <div
-                className="study-flip-inner"
-                style={{ width: '100%', height: '100%' }}
-              >
-                {/* 表 */}
-                <Card
-                  className={cn(
-                    'study-flip-front relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
-                    dragState.isDragging && 'cursor-grabbing',
-                  )}
-                  style={{
-                    transformOrigin: 'center center',
-                    boxShadow: dragState.isDragging
-                      ? '0 10px 20px rgba(0, 0, 0, 0.15)'
-                      : '0 4px 6px rgba(0, 0, 0, 0.1)',
-                    height: '100%',
-                  }}
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+          {/* ヘッダー部分 */}
+          <div className="w-full mb-4 sm:mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{currentIndex + 1}</span>
+                <span className="text-muted-foreground">/</span>
+                <span className="text-muted-foreground">{totalCards}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setSettingOpen(true)}
+                  variant="ghost"
+                  size="icon"
                 >
-                  {/* ドラッグ中の方向インジケーター */}
-                  {dragState.isDragging && (
-                    <div
-                      className={cn(
-                        'absolute inset-0 rounded-lg transition-opacity duration-200',
-                        dragState.direction === 'left'
-                          ? 'bg-red-500/20'
-                          : dragState.direction === 'right'
-                          ? 'bg-green-500/20'
-                          : 'bg-transparent',
-                      )}
-                    />
-                  )}
-                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        speak(extractPlainText(front));
-                      }}
-                    >
-                      <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </Button>
-                  </div>
-                  <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
-                    <MathText text={front} />
-                  </div>
-                </Card>
-                {/* 裏 */}
-                <Card
-                  className={cn(
-                    'study-flip-back relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
-                    dragState.isDragging && 'cursor-grabbing',
-                  )}
-                  style={{
-                    transformOrigin: 'center center',
-                    boxShadow: dragState.isDragging
-                      ? '0 10px 20px rgba(0, 0, 0, 0.15)'
-                      : '0 4px 6px rgba(0, 0, 0, 0.1)',
-                    height: '100%',
-                  }}
+                  <Cog className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard')}
+                  className="rounded-full px-4 sm:px-6"
                 >
-                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        speak(extractPlainText(back));
-                      }}
-                    >
-                      <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </Button>
-                  </div>
-                  <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
-                    <MathText text={back} />
-                  </div>
-                </Card>
+                  終了
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleRestart}
+                  className="rounded-full px-4 sm:px-6"
+                >
+                  再スタート
+                </Button>
               </div>
             </div>
-
-            {/* PC表示時の右ボタン */}
-            <Button
-              variant="ghost"
-              className={cn(
-                'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
-                showAnswer
-                  ? 'bg-green-500 hover:bg-green-600 text-white'
-                  : 'bg-blue-500 hover:bg-blue-600 text-white',
-              )}
-              onClick={showAnswer ? handleCorrect : () => setShowAnswer(true)}
-            >
-              {showAnswer ? '正解' : '答え'}
-            </Button>
+            <div className="h-2 rounded-full overflow-hidden bg-muted">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
 
-          {/* スマホ表示時のボタン */}
-          <div className="sm:hidden flex flex-col gap-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
+          {/* カード部分 */}
+          <style>{cardFlipStyles}</style>
+          <div className="w-full relative">
+            <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr_120px] gap-4 min-h-[400px] sm:h-[500px]">
+              {/* PC表示時の左ボタン */}
               <Button
                 variant="ghost"
                 className={cn(
-                  'h-12 rounded-xl font-bold text-lg',
+                  'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
                   showAnswer
                     ? 'bg-red-500 hover:bg-red-600 text-white'
                     : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
@@ -730,10 +598,120 @@ export default function StudyPage() {
               >
                 {showAnswer ? '不正解' : '分からない'}
               </Button>
+
+              {/* カード本体 */}
+              <div
+                className={cn(
+                  'relative flex-1 study-flip-card',
+                  showAnswer && 'flipped',
+                )}
+                style={{ minHeight: '300px', height: '100%' }}
+                onClick={() => setShowAnswer((p) => !p)}
+                onTouchStart={(e) => {
+                  const touch = e.touches[0];
+                  handleDragStart(touch.clientX, touch.clientY);
+                }}
+                onTouchMove={(e) => {
+                  const touch = e.touches[0];
+                  handleDrag(touch.clientX, touch.clientY);
+                }}
+                onTouchEnd={() => handleDragEnd()}
+                onMouseDown={(e) => {
+                  handleDragStart(e.clientX, e.clientY);
+                }}
+                onMouseMove={(e) => {
+                  handleDrag(e.clientX, e.clientY);
+                }}
+                onMouseUp={() => handleDragEnd()}
+                onMouseLeave={() => handleDragEnd()}
+              >
+                <div
+                  className="study-flip-inner"
+                  style={{ width: '100%', height: '100%' }}
+                >
+                  {/* 表 */}
+                  <Card
+                    className={cn(
+                      'study-flip-front relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
+                      dragState.isDragging && 'cursor-grabbing',
+                    )}
+                    style={{
+                      transformOrigin: 'center center',
+                      boxShadow: dragState.isDragging
+                        ? '0 10px 20px rgba(0, 0, 0, 0.15)'
+                        : '0 4px 6px rgba(0, 0, 0, 0.1)',
+                      height: '100%',
+                    }}
+                  >
+                    {/* ドラッグ中の方向インジケーター */}
+                    {dragState.isDragging && (
+                      <div
+                        className={cn(
+                          'absolute inset-0 rounded-lg transition-opacity duration-200',
+                          dragState.direction === 'left'
+                            ? 'bg-red-500/20'
+                            : dragState.direction === 'right'
+                            ? 'bg-green-500/20'
+                            : 'bg-transparent',
+                        )}
+                      />
+                    )}
+                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          speak(extractPlainText(front));
+                        }}
+                      >
+                        <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </Button>
+                    </div>
+                    <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
+                      <MathText text={front} />
+                    </div>
+                  </Card>
+                  {/* 裏 */}
+                  <Card
+                    className={cn(
+                      'study-flip-back relative flex items-center justify-center p-4 sm:p-8 cursor-pointer select-none min-h-[300px] sm:min-h-[500px] transition-all duration-200 touch-none',
+                      dragState.isDragging && 'cursor-grabbing',
+                    )}
+                    style={{
+                      transformOrigin: 'center center',
+                      boxShadow: dragState.isDragging
+                        ? '0 10px 20px rgba(0, 0, 0, 0.15)'
+                        : '0 4px 6px rgba(0, 0, 0, 0.1)',
+                      height: '100%',
+                    }}
+                  >
+                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          speak(extractPlainText(back));
+                        }}
+                      >
+                        <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </Button>
+                    </div>
+                    <div className="text-2xl sm:text-4xl font-bold text-center break-words px-4 max-w-xl mx-auto">
+                      <MathText text={back} />
+                    </div>
+                  </Card>
+                </div>
+              </div>
+
+              {/* PC表示時の右ボタン */}
               <Button
                 variant="ghost"
                 className={cn(
-                  'h-12 rounded-xl font-bold text-lg',
+                  'hidden sm:block h-full writing-mode-vertical rounded-xl font-bold text-lg',
                   showAnswer
                     ? 'bg-green-500 hover:bg-green-600 text-white'
                     : 'bg-blue-500 hover:bg-blue-600 text-white',
@@ -743,33 +721,65 @@ export default function StudyPage() {
                 {showAnswer ? '正解' : '答え'}
               </Button>
             </div>
-          </div>
 
-          {/* 戻る／進むボタン */}
-          <div className="flex justify-between mt-4 sm:mt-8 px-2 sm:px-0">
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-28 sm:w-32 rounded-full"
-              onClick={prev}
-              disabled={currentIndex === 0}
-            >
-              戻る
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-28 sm:w-32 rounded-full"
-              onClick={() => {
-                if (currentIndex >= totalCards - 1) {
-                  handleNext(undefined);
-                } else {
-                  next();
-                }
-              }}
-            >
-              スキップ
-            </Button>
+            {/* スマホ表示時のボタン */}
+            <div className="sm:hidden flex flex-col gap-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    'h-12 rounded-xl font-bold text-lg',
+                    showAnswer
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
+                      : 'bg-gray-300 hover:bg-gray-400 text-gray-700',
+                  )}
+                  onClick={handleIncorrect}
+                >
+                  {showAnswer ? '不正解' : '分からない'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    'h-12 rounded-xl font-bold text-lg',
+                    showAnswer
+                      ? 'bg-green-500 hover:bg-green-600 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white',
+                  )}
+                  onClick={
+                    showAnswer ? handleCorrect : () => setShowAnswer(true)
+                  }
+                >
+                  {showAnswer ? '正解' : '答え'}
+                </Button>
+              </div>
+            </div>
+
+            {/* 戻る／進むボタン */}
+            <div className="flex justify-between mt-4 sm:mt-8 px-2 sm:px-0">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-28 sm:w-32 rounded-full"
+                onClick={prev}
+                disabled={currentIndex === 0}
+              >
+                戻る
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-28 sm:w-32 rounded-full"
+                onClick={() => {
+                  if (currentIndex >= totalCards - 1) {
+                    handleNext(undefined);
+                  } else {
+                    next();
+                  }
+                }}
+              >
+                スキップ
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -819,31 +829,38 @@ export default function StudyPage() {
 */
 
 const cardFlipStyles = `
-  .study-flip-card {
-    perspective: 1200px;
-  }
-  .study-flip-inner {
-    transition: transform 0.5s cubic-bezier(0.4,0.2,0.2,1);
-    transform-style: preserve-3d;
-    position: relative;
-    width: 100%;
-    height: 100%;
-  }
-  .study-flip-card.flipped .study-flip-inner {
-    transform: rotateY(180deg);
-  }
-  .study-flip-front, .study-flip-back {
-    backface-visibility: hidden;
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0; left: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-  .study-flip-back {
-    transform: rotateY(180deg);
-  }
+.study-flip-card {
+  perspective: 1200px;
+}
+.study-flip-inner {
+  transition: transform 0.3s cubic-bezier(0.4,0.2,0.2,1);
+  transform-style: preserve-3d;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.study-flip-card.flipped .study-flip-inner {
+  transform: rotateY(180deg);
+}
+.study-flip-front, .study-flip-back {
+  backface-visibility: hidden;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0; left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+}
+.study-flip-back {
+  transform: rotateY(180deg);
+}
+.study-flip-card:not(.flipped) .study-flip-back {
+  opacity: 0;
+}
+.study-flip-card.flipped .study-flip-front {
+  opacity: 0;
+}
 `;

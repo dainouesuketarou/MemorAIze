@@ -9,13 +9,13 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 // ログイン履歴を記録
 export async function POST(req: Request) {
   try {
-    const session = await getAuthSession();
-    if (!session?.user?.email) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
     });
 
     if (!user) {
@@ -41,7 +41,11 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('ログイン履歴の記録に失敗しました:', error);
     return NextResponse.json(
-      { error: 'ログイン履歴の記録に失敗しました' },
+      {
+        error: 'ログイン履歴の記録に失敗しました',
+        detail: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      },
       { status: 500 },
     );
   }
@@ -59,16 +63,19 @@ export async function GET(req: Request) {
     const start = searchParams.get('start');
     const end = searchParams.get('end');
 
+    if (!start || !end) {
+      return NextResponse.json(
+        { error: '開始日と終了日が必要です' },
+        { status: 400 },
+      );
+    }
+
     const where = {
       userId: session.user.id,
-      ...(start && end
-        ? {
-            loginAt: {
-              gte: toZonedTime(new Date(start), 'Asia/Tokyo'),
-              lte: toZonedTime(new Date(end), 'Asia/Tokyo'),
-            },
-          }
-        : {}),
+      loginAt: {
+        gte: toZonedTime(new Date(start), 'Asia/Tokyo'),
+        lte: toZonedTime(new Date(end), 'Asia/Tokyo'),
+      },
     };
 
     const loginHistory = await prisma.loginHistory.findMany({
@@ -80,7 +87,7 @@ export async function GET(req: Request) {
   } catch (error) {
     console.error('ログイン履歴の取得に失敗しました:', error);
     return NextResponse.json(
-      { error: 'ログイン履歴の取得に失敗しました' },
+      { error: 'ログイン履歴の取得に失敗しました', detail: String(error) },
       { status: 500 },
     );
   }

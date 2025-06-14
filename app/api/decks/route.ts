@@ -79,9 +79,12 @@ export async function GET() {
   }
 
   try {
+    // !!! 重要: セキュリティ上の理由で、ログインユーザーのデッキのみを取得する必要があります !!!
+    // !!! この実装を変更すると、他のユーザーのデッキが表示される可能性があります !!!
+    // !!! 変更する場合は、必ずセキュリティレビューを受けてください !!!
     const decks = await prisma.deck.findMany({
       where: {
-        userId: session.user.id,
+        userId: session.user.id, // ログインユーザーのIDでフィルタリング
       },
       include: {
         cards: {

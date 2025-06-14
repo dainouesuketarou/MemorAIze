@@ -39,6 +39,11 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/logo.png" />
         <link rel="apple-touch-icon" href="/logo.png" />
+        <link
+          rel="preload"
+          href="/_next/static/css/3864b451a61e4546.css"
+          as="style"
+        />
       </head>
       <body className={inter.className}>
         <Providers>

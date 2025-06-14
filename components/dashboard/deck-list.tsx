@@ -55,6 +55,10 @@ export function DeckList({
   groups,
   setDecks,
 }: DeckListProps) {
+  // !!! 重要: このコンポーネントは認証済みユーザーのデッキのみを表示する必要があります !!!
+  // !!! decks プロパティには、APIから取得したログインユーザーのデッキのみが含まれる必要があります !!!
+  // !!! この実装を変更する場合は、必ずセキュリティレビューを受けてください !!!
+
   const dispatch = useDispatch();
   const { isLoading } = useSelector((state: RootState) => state.deck);
   const [modalOpen, setModalOpen] = useState(false);
