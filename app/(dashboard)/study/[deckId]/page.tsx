@@ -837,31 +837,31 @@ export default function StudyPage() {
 */
 
 const cardFlipStyles = `
-//   .study-flip-card {
-//     perspective: 1200px;
-//   }
-//   .study-flip-inner {
-//     transition: transform 0.5s cubic-bezier(0.4,0.2,0.2,1);
-//     transform-style: preserve-3d;
-//     position: relative;
-//     width: 100%;
-//     height: 100%;
-//   }
-//   .study-flip-card.flipped .study-flip-inner {
-//     transform: rotateY(180deg);
-//   }
-//   .study-flip-front, .study-flip-back {
-//     backface-visibility: hidden;
-//     position: absolute;
-//     width: 100%;
-//     height: 100%;
-//     top: 0; left: 0;
-//     display: flex;
-//     flex-direction: column;
-//     align-items: center;
-//     justify-content: center;
-//   }
-//   .study-flip-back {
-//     transform: rotateY(180deg);
-//   }
-// `;
+  .study-flip-card {
+    perspective: 1200px;
+  }
+  .study-flip-inner {
+    transition: transform 0.5s cubic-bezier(0.4,0.2,0.2,1);
+    transform-style: preserve-3d;
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .study-flip-card.flipped .study-flip-inner {
+    transform: rotateY(180deg);
+  }
+  .study-flip-front, .study-flip-back {
+    backface-visibility: hidden;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0; left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .study-flip-back {
+    transform: rotateY(180deg);
+  }
+`;
