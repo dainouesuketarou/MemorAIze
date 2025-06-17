@@ -165,14 +165,6 @@ export function AiGenerateForm({ groups }: AiGenerateFormProps) {
   /* ------------------------------ 保存ハンドラ ----------------------------- */
   const handleSave = async (title: string, cards: PreviewCard[]) => {
     if (!cards.length) return;
-    if (selectedGroupIds.length === 0) {
-      toast({
-        title: 'エラー',
-        description: '少なくとも1つの分野を選択してください',
-        variant: 'destructive',
-      });
-      return;
-    }
     setIsSaving(true);
     setError(null);
 
