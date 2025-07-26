@@ -128,20 +128,7 @@ export default function DashboardPage() {
           </Link>
         </DashboardHeader>
 
-        <div className="grid gap-4 md:grid-cols-[1fr_4fr]">
-          <Sidebar
-            groups={reduxGroups}
-            setGroups={(groups) =>
-              dispatch(setGroups(groups as Group[]) as unknown as AnyAction)
-            }
-            selectedGroup={selectedGroup}
-            setSelectedGroup={setSelectedGroup}
-            newGroupName={newGroupName}
-            setNewGroupName={setNewGroupName}
-            showGroupInput={showGroupInput}
-            setShowGroupInput={setShowGroupInput}
-          />
-
+        <div className="grid gap-4 md:grid-cols-[4fr_1fr]">
           <div className="space-y-4">
             <DeckFilter
               filter={reduxFilter}
@@ -162,6 +149,19 @@ export default function DashboardPage() {
               }
             />
           </div>
+
+          <Sidebar
+            groups={reduxGroups}
+            setGroups={(groups) =>
+              dispatch(setGroups(groups as Group[]) as unknown as AnyAction)
+            }
+            selectedGroup={selectedGroup}
+            setSelectedGroup={setSelectedGroup}
+            newGroupName={newGroupName}
+            setNewGroupName={setNewGroupName}
+            showGroupInput={showGroupInput}
+            setShowGroupInput={setShowGroupInput}
+          />
         </div>
       </div>
     </DashboardShell>
