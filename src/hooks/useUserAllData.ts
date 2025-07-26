@@ -53,31 +53,59 @@ export const useUserAllData = () => {
         );
 
         // 並列でAPI取得（セッションで取得できない情報のみ）
-        const [subRes, aiRes, deckRes, groupRes] = await Promise.all([
-          fetch('/api/subscription/status', { credentials: 'include' }),
-          fetch('/api/ai-generation-limit', { credentials: 'include' }),
-          fetch('/api/decks', { credentials: 'include' }),
-          fetch('/api/groups', { credentials: 'include' }),
+        const [subRes, aiRes, deckRes, groupRes] = await Promise.allSettled([
+          fetch('/api/subscription/status', {
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          }),
+          fetch('/api/ai-generation-limit', {
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          }),
+          fetch('/api/decks', {
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          }),
+          fetch('/api/groups', {
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          }),
         ]);
 
-        // レスポンスのステータスをチェック
-        if (!subRes.ok || !aiRes.ok || !deckRes.ok || !groupRes.ok) {
-          throw new Error('APIリクエストが失敗しました');
-        }
+        // 成功したレスポンスのみを処理
+        const results = await Promise.allSettled([
+          subRes.status === 'fulfilled'
+            ? subRes.value.json()
+            : Promise.resolve(null),
+          aiRes.status === 'fulfilled'
+            ? aiRes.value.json()
+            : Promise.resolve(null),
+          deckRes.status === 'fulfilled'
+            ? deckRes.value.json()
+            : Promise.resolve(null),
+          groupRes.status === 'fulfilled'
+            ? groupRes.value.json()
+            : Promise.resolve(null),
+        ]);
 
-        const [subscription, aiLimitData, decksData, groupsData] =
-          await Promise.all([
-            subRes.json(),
-            aiRes.json(),
-            deckRes.json(),
-            groupRes.json(),
-          ]);
+        const [subscription, aiLimitData, decksData, groupsData] = results.map(
+          (result) => (result.status === 'fulfilled' ? result.value : null),
+        );
 
-        // Reduxに保存
-        dispatch(setSubscription(subscription));
-        dispatch(setLimit(aiLimitData.limit));
-        dispatch(setDecks(decksData));
-        dispatch(setGroups(groupsData));
+        // Reduxに保存（nullの場合はスキップ）
+        if (subscription) dispatch(setSubscription(subscription));
+        if (aiLimitData?.limit) dispatch(setLimit(aiLimitData.limit));
+        if (decksData) dispatch(setDecks(decksData));
+        if (groupsData) dispatch(setGroups(groupsData));
+
         setInitialized(true);
       } catch (e) {
         console.error('ユーザーデータ一括取得に失敗:', e);
