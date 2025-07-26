@@ -15,16 +15,16 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <ReduxProvider store={store}>
-        {/* <SyncSessionToRedux> */}
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          themes={['light', 'dark', 'blue', 'green']}
-        >
-          {children}
-        </ThemeProvider>
-        {/* </SyncSessionToRedux> */}
+        <SyncSessionToRedux>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem={false}
+            themes={['light', 'dark', 'blue', 'green']}
+          >
+            {children}
+          </ThemeProvider>
+        </SyncSessionToRedux>
       </ReduxProvider>
     </SessionProvider>
   );
