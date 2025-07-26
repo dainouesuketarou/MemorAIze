@@ -72,19 +72,13 @@ export default function LoginPage() {
     }
   }, [router]);
 
-  // セッションの状態に基づいてリダイレクト
+  // セッションの状態に基づいてリダイレクト（データ取得を待たない）
   useEffect(() => {
-    const handleSession = async () => {
-      if (status === 'authenticated' && session?.user?.email && !dataLoading) {
-        // ユーザー情報が完全に取得できていることを確認
-        if (user.id) {
-          await checkOnboardingStatus();
-        }
-      }
-    };
-
-    handleSession();
-  }, [status, session, user.id, dataLoading, checkOnboardingStatus]);
+    if (status === 'authenticated' && session?.user?.email) {
+      // データ取得を待たずにオンボーディング状態をチェック
+      checkOnboardingStatus();
+    }
+  }, [status, session, checkOnboardingStatus]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -123,9 +117,9 @@ export default function LoginPage() {
         throw new Error(result.error);
       }
 
-      // ユーザー情報の取得を待機
+      // ユーザー情報の取得を待機（短縮）
       let retryCount = 0;
-      const maxRetries = 10;
+      const maxRetries = 5; // 5回に短縮
 
       while (retryCount < maxRetries) {
         const session = await fetch('/api/auth/session').then((res) =>
@@ -136,27 +130,28 @@ export default function LoginPage() {
           await checkOnboardingStatus();
           break;
         }
-        // 500ms待機してから再試行
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // 200ms待機してから再試行（短縮）
+        await new Promise((resolve) => setTimeout(resolve, 200));
         retryCount++;
       }
 
       if (retryCount === maxRetries) {
-        throw new Error(
-          'ユーザー情報の取得に時間がかかっています。ページを更新してください。',
-        );
+        // タイムアウトしてもダッシュボードに遷移
+        router.push('/dashboard');
       }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'エラーが発生しました',
       );
+      // エラーが発生してもダッシュボードに遷移
+      router.push('/dashboard');
     } finally {
       setIsLoading(false);
     }
   };
 
   // ローディング中は何も表示しない
-  if (status === 'loading' || dataLoading) {
+  if (status === 'loading') {
     return null;
   }
 

@@ -7,7 +7,7 @@ import { DashboardHeader } from '@/src/components/dashboard/header';
 import { DashboardShell } from '@/src/components/dashboard/shell';
 import { DeckList } from '@/src/components/dashboard/deck-list';
 import { Button } from '@/src/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { DeckWithCardsAndGroups } from '@/src/types/deck';
 import { useSession } from 'next-auth/react';
@@ -32,7 +32,7 @@ import { AnyAction } from '@reduxjs/toolkit';
 import { useUserAllData } from '@/src/hooks/useUserAllData';
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const dispatch = useDispatch<AppDispatch>();
   const {
     user,
@@ -54,23 +54,7 @@ export default function DashboardPage() {
   const [showGroupInput, setShowGroupInput] = useState<boolean>(false);
   const [groupMode, setGroupMode] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (!session?.user?.id || dataLoading) return;
-
-    // データが存在しない場合のみフェッチ
-    if (!reduxDecks.length || !reduxGroups.length) {
-      dispatch(fetchDecksIfNeeded() as unknown as AnyAction);
-      dispatch(fetchGroupsIfNeeded() as unknown as AnyAction);
-    }
-  }, [
-    session?.user?.id,
-    dataLoading,
-    dispatch,
-    reduxDecks.length,
-    reduxGroups.length,
-  ]);
-
-  // フィルタリングとソートの適用
+  // フィルタリングとソートの適用（Hooksは早期リターンの前に配置）
   const filteredAndSortedDecks = useMemo(() => {
     const filtered =
       selectedGroup === 'all'
@@ -105,9 +89,28 @@ export default function DashboardPage() {
       });
   }, [reduxDecks, selectedGroup, reduxFilter, reduxSort]);
 
-  // データローディング中は何も表示しない
-  if (dataLoading) {
+  // セッションのローディング中は何も表示しない
+  if (status === 'loading') {
     return null;
+  }
+
+  // 認証されていない場合はログインページにリダイレクト
+  if (status === 'unauthenticated') {
+    return null; // リダイレクトはmiddlewareで処理
+  }
+
+  // データローディング中の表示
+  if (dataLoading || !user.id) {
+    return (
+      <DashboardShell groupMode={groupMode} setGroupMode={setGroupMode}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">データを読み込み中...</p>
+          </div>
+        </div>
+      </DashboardShell>
+    );
   }
 
   return (
