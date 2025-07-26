@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -29,9 +29,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { signIn } from 'next-auth/react';
 import { useSession } from 'next-auth/react';
-import { useUserAllData } from '@/src/hooks/useUserAllData';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/src/lib/store/store';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -43,109 +40,14 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
-  const { user, loading: dataLoading } = useUserAllData();
 
-  // Reduxの状態を確認
-  const reduxUser = useSelector((state: RootState) => state.user);
-  const reduxDecks = useSelector((state: RootState) => state.deck.decks);
-  const reduxGroups = useSelector((state: RootState) => state.group.groups);
-
-  // 重複実行を防ぐためのref
-  const isRedirecting = useRef(false);
-  const hasCheckedOnboarding = useRef(false);
-
-  const checkOnboardingStatus = useCallback(async () => {
-    // 既にチェック済みの場合はスキップ
-    if (hasCheckedOnboarding.current) {
-      console.log('オンボーディング状態は既にチェック済み');
-      return;
-    }
-
-    hasCheckedOnboarding.current = true;
-    console.log('オンボーディング状態をチェック開始');
-
-    try {
-      const response = await fetch('/api/auth/onboarding/status');
-      const data = await response.json();
-
-      // ログイン履歴を記録（日本時間で記録）
-      const now = new Date();
-      const jpNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-      await fetch('/api/auth/login-history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          loginAt: jpNow.toISOString(),
-        }),
-      });
-
-      if (!data.isOnboarded) {
-        console.log('オンボーディング未完了、オンボーディングページに遷移');
-        router.push('/onboarding');
-      } else {
-        console.log('オンボーディング完了、ダッシュボードに遷移');
-        router.push('/dashboard');
-      }
-    } catch (error) {
-      console.error('オンボーディング状態の確認に失敗しました:', error);
+  // 認証済みの場合は即座にダッシュボードに遷移
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.email) {
+      console.log('認証完了、ダッシュボードに即座に遷移');
       router.push('/dashboard');
     }
-  }, [router]);
-
-  // セッションの状態に基づいてリダイレクト（最適化版）
-  useEffect(() => {
-    // 既にリダイレクト中の場合はスキップ
-    if (isRedirecting.current) {
-      return;
-    }
-
-    if (status === 'authenticated' && session?.user?.email) {
-      isRedirecting.current = true;
-      console.log('認証完了、リダイレクト処理開始');
-
-      // Reduxにデータがある場合は即座に遷移（最優先）
-      if (reduxUser.id && reduxDecks.length > 0 && reduxGroups.length > 0) {
-        console.log(
-          'Reduxにデータがあるため即座にオンボーディング状態をチェック',
-        );
-        checkOnboardingStatus();
-        return;
-      }
-
-      // Reduxにデータがない場合のみセッション確認（1回だけ）
-      const checkSessionAndRedirect = async () => {
-        try {
-          console.log('Reduxにデータがないためセッション確認を実行');
-          const sessionData = await fetch('/api/auth/session').then((res) =>
-            res.json(),
-          );
-
-          if (sessionData?.user?.email) {
-            console.log('セッション確認成功、オンボーディング状態をチェック');
-            await checkOnboardingStatus();
-          } else {
-            console.log('セッション確認失敗、ダッシュボードに遷移');
-            router.push('/dashboard');
-          }
-        } catch (error) {
-          console.error('セッション確認エラー:', error);
-          router.push('/dashboard');
-        }
-      };
-
-      checkSessionAndRedirect();
-    }
-  }, [
-    status,
-    session,
-    reduxUser.id,
-    reduxDecks.length,
-    reduxGroups.length,
-    checkOnboardingStatus,
-    router,
-  ]);
+  }, [status, session, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -184,40 +86,13 @@ export default function LoginPage() {
         throw new Error(result.error);
       }
 
-      // 最適化されたユーザー情報取得（リトライ回数をさらに削減）
-      let retryCount = 0;
-      const maxRetries = 2; // 2回に削減
-
-      while (retryCount < maxRetries) {
-        try {
-          const session = await fetch('/api/auth/session').then((res) =>
-            res.json(),
-          );
-
-          if (session?.user?.email) {
-            console.log('Googleログイン成功、オンボーディング状態をチェック');
-            await checkOnboardingStatus();
-            break;
-          }
-
-          retryCount++;
-          // 待機時間をさらに短縮（100ms → 50ms）
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        } catch (error) {
-          console.error('セッション確認エラー:', error);
-          retryCount++;
-        }
-      }
-
-      if (retryCount === maxRetries) {
-        console.log('タイムアウト、ダッシュボードに遷移');
-        router.push('/dashboard');
-      }
+      // 簡素化された処理：認証後は即座にダッシュボードに遷移
+      console.log('Googleログイン成功、ダッシュボードに遷移');
+      router.push('/dashboard');
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'エラーが発生しました',
       );
-      router.push('/dashboard');
     } finally {
       setIsLoading(false);
     }
