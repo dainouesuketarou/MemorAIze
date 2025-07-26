@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { getAuthSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAuthSession } from '@/src/lib/auth';
+import { prisma } from '@/src/lib/prisma';
 import { parseISO } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';

@@ -1,10 +1,10 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
-import { prisma } from '@/lib/prisma';
+import { stripe } from '@/src/lib/stripe';
+import { prisma } from '@/src/lib/prisma';
 import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 import type Stripe from 'stripe';
-import { STRIPE_PRICE_IDS } from '@/lib/stripe'; // STRIPE_PRICE_IDSをインポート
+import { STRIPE_PRICE_IDS } from '@/src/lib/stripe'; // STRIPE_PRICE_IDSをインポート
 import { toZonedTime } from 'date-fns-tz';
 
 // 動的レンダリングを明示的に指定
