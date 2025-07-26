@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -50,7 +50,20 @@ export default function LoginPage() {
   const reduxDecks = useSelector((state: RootState) => state.deck.decks);
   const reduxGroups = useSelector((state: RootState) => state.group.groups);
 
+  // 重複実行を防ぐためのref
+  const isRedirecting = useRef(false);
+  const hasCheckedOnboarding = useRef(false);
+
   const checkOnboardingStatus = useCallback(async () => {
+    // 既にチェック済みの場合はスキップ
+    if (hasCheckedOnboarding.current) {
+      console.log('オンボーディング状態は既にチェック済み');
+      return;
+    }
+
+    hasCheckedOnboarding.current = true;
+    console.log('オンボーディング状態をチェック開始');
+
     try {
       const response = await fetch('/api/auth/onboarding/status');
       const data = await response.json();
@@ -69,8 +82,10 @@ export default function LoginPage() {
       });
 
       if (!data.isOnboarded) {
+        console.log('オンボーディング未完了、オンボーディングページに遷移');
         router.push('/onboarding');
       } else {
+        console.log('オンボーディング完了、ダッシュボードに遷移');
         router.push('/dashboard');
       }
     } catch (error) {
@@ -81,18 +96,28 @@ export default function LoginPage() {
 
   // セッションの状態に基づいてリダイレクト（最適化版）
   useEffect(() => {
+    // 既にリダイレクト中の場合はスキップ
+    if (isRedirecting.current) {
+      return;
+    }
+
     if (status === 'authenticated' && session?.user?.email) {
-      // Reduxにデータがある場合は即座に遷移
+      isRedirecting.current = true;
+      console.log('認証完了、リダイレクト処理開始');
+
+      // Reduxにデータがある場合は即座に遷移（最優先）
       if (reduxUser.id && reduxDecks.length > 0 && reduxGroups.length > 0) {
-        console.log('Reduxにデータがあるため即座に遷移');
+        console.log(
+          'Reduxにデータがあるため即座にオンボーディング状態をチェック',
+        );
         checkOnboardingStatus();
         return;
       }
 
-      // Reduxにデータがない場合のみセッション確認
+      // Reduxにデータがない場合のみセッション確認（1回だけ）
       const checkSessionAndRedirect = async () => {
         try {
-          // 1回だけセッション確認
+          console.log('Reduxにデータがないためセッション確認を実行');
           const sessionData = await fetch('/api/auth/session').then((res) =>
             res.json(),
           );
@@ -101,13 +126,11 @@ export default function LoginPage() {
             console.log('セッション確認成功、オンボーディング状態をチェック');
             await checkOnboardingStatus();
           } else {
-            // セッションが取得できない場合はダッシュボードに遷移（データは後で取得）
             console.log('セッション確認失敗、ダッシュボードに遷移');
             router.push('/dashboard');
           }
         } catch (error) {
           console.error('セッション確認エラー:', error);
-          // エラーが発生してもダッシュボードに遷移
           router.push('/dashboard');
         }
       };
@@ -161,9 +184,9 @@ export default function LoginPage() {
         throw new Error(result.error);
       }
 
-      // 最適化されたユーザー情報取得
+      // 最適化されたユーザー情報取得（リトライ回数をさらに削減）
       let retryCount = 0;
-      const maxRetries = 3; // 3回に削減
+      const maxRetries = 2; // 2回に削減
 
       while (retryCount < maxRetries) {
         try {
@@ -178,8 +201,8 @@ export default function LoginPage() {
           }
 
           retryCount++;
-          // 待機時間を短縮（200ms → 100ms）
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          // 待機時間をさらに短縮（100ms → 50ms）
+          await new Promise((resolve) => setTimeout(resolve, 50));
         } catch (error) {
           console.error('セッション確認エラー:', error);
           retryCount++;
@@ -194,7 +217,6 @@ export default function LoginPage() {
       toast.error(
         error instanceof Error ? error.message : 'エラーが発生しました',
       );
-      // エラーが発生してもダッシュボードに遷移
       router.push('/dashboard');
     } finally {
       setIsLoading(false);

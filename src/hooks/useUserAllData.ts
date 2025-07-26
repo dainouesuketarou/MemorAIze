@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/src/lib/store/store';
 import { setUser, setSubscription } from '@/src/lib/store/slices/userSlice';
@@ -22,6 +22,9 @@ export const useUserAllData = () => {
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
+  // 重複実行を防ぐためのref
+  const isFetching = useRef(false);
+
   useEffect(() => {
     const fetchAll = async () => {
       // ログインしていない場合は何もしない
@@ -29,13 +32,21 @@ export const useUserAllData = () => {
         return;
       }
 
+      // 既にフェッチ中の場合は何もしない
+      if (isFetching.current) {
+        console.log('既にデータ取得中、スキップ');
+        return;
+      }
+
       // すでに初期化済みで、ユーザーIDが存在する場合は何もしない
       if (initialized && userState.id) {
+        console.log('初期化済みでユーザーIDが存在、スキップ');
         return;
       }
 
       // データ取得中は重複実行を防ぐ
       if (loading) {
+        console.log('ローディング中、スキップ');
         return;
       }
 
@@ -48,8 +59,12 @@ export const useUserAllData = () => {
         return;
       }
 
+      isFetching.current = true;
       setLoading(true);
+
       try {
+        console.log('ユーザーデータ一括取得開始');
+
         // セッション情報をReduxに保存
         dispatch(
           setUser({
@@ -115,6 +130,7 @@ export const useUserAllData = () => {
         if (decksData) dispatch(setDecks(decksData));
         if (groupsData) dispatch(setGroups(groupsData));
 
+        console.log('ユーザーデータ一括取得完了');
         setInitialized(true);
       } catch (e) {
         console.error('ユーザーデータ一括取得に失敗:', e);
@@ -122,6 +138,7 @@ export const useUserAllData = () => {
         setInitialized(true);
       } finally {
         setLoading(false);
+        isFetching.current = false;
       }
     };
 
