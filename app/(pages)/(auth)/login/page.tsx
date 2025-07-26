@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -41,13 +41,62 @@ export default function LoginPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  // 認証済みの場合は即座にダッシュボードに遷移
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user?.email) {
-      console.log('認証完了、ダッシュボードに即座に遷移');
+  // 重複実行を防ぐためのref
+  const hasCheckedOnboarding = useRef(false);
+  const isRedirecting = useRef(false);
+
+  const checkOnboardingStatus = useCallback(async () => {
+    // 既にチェック済みの場合はスキップ
+    if (hasCheckedOnboarding.current) {
+      console.log('オンボーディング状態は既にチェック済み');
+      return;
+    }
+
+    hasCheckedOnboarding.current = true;
+    console.log('オンボーディング状態をチェック開始');
+
+    try {
+      const response = await fetch('/api/auth/onboarding/status');
+      const data = await response.json();
+
+      // ログイン履歴を記録（日本時間で記録）
+      const now = new Date();
+      const jpNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      await fetch('/api/auth/login-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          loginAt: jpNow.toISOString(),
+        }),
+      });
+
+      if (!data.isOnboarded) {
+        console.log('オンボーディング未完了、オンボーディングページに遷移');
+        router.push('/onboarding');
+      } else {
+        console.log('オンボーディング完了、ダッシュボードに遷移');
+        router.push('/dashboard');
+      }
+    } catch (error) {
+      console.error('オンボーディング状態の確認に失敗しました:', error);
       router.push('/dashboard');
     }
-  }, [status, session, router]);
+  }, [router]);
+
+  // 認証済みの場合はオンボーディング状態をチェック
+  useEffect(() => {
+    if (isRedirecting.current) {
+      return;
+    }
+
+    if (status === 'authenticated' && session?.user?.email) {
+      isRedirecting.current = true;
+      console.log('認証完了、オンボーディング状態をチェック');
+      checkOnboardingStatus();
+    }
+  }, [status, session, checkOnboardingStatus]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -86,9 +135,37 @@ export default function LoginPage() {
         throw new Error(result.error);
       }
 
-      // 簡素化された処理：認証後は即座にダッシュボードに遷移
-      console.log('Googleログイン成功、ダッシュボードに遷移');
-      router.push('/dashboard');
+      // Googleログイン後はセッション確認を待ってからオンボーディング状態をチェック
+      console.log('Googleログイン成功、セッション確認を待機');
+
+      // セッション確認を待機（短時間）
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      while (retryCount < maxRetries) {
+        try {
+          const sessionData = await fetch('/api/auth/session').then((res) =>
+            res.json(),
+          );
+
+          if (sessionData?.user?.email) {
+            console.log('セッション確認成功、オンボーディング状態をチェック');
+            await checkOnboardingStatus();
+            break;
+          }
+
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        } catch (error) {
+          console.error('セッション確認エラー:', error);
+          retryCount++;
+        }
+      }
+
+      if (retryCount === maxRetries) {
+        console.log('セッション確認タイムアウト、ダッシュボードに遷移');
+        router.push('/dashboard');
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'エラーが発生しました',
