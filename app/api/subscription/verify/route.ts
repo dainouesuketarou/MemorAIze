@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { stripe } from '@/lib/stripe';
+import { stripe } from '@/src/lib/stripe';
 // prismaはここでは直接使用しない
 // import { prisma } from '@/lib/prisma';
 // SubscriptionStatus, SubscriptionPlan はここでは直接使用しない
 // import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 import Stripe from 'stripe';
-import { STRIPE_PRICE_IDS } from '@/lib/stripe'; // 必要に応じてプラン特定に利用
+import { STRIPE_PRICE_IDS } from '@/src/lib/stripe'; // 必要に応じてプラン特定に利用
 
 export async function POST(req: Request) {
   try {

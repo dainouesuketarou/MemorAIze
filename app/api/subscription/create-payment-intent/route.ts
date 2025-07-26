@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { stripe } from '@/lib/stripe';
-import { prisma } from '@/lib/prisma';
+import { stripe } from '@/src/lib/stripe';
+import { prisma } from '@/src/lib/prisma';
 
 export async function POST() {
   try {

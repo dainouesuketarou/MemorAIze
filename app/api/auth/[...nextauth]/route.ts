@@ -4,12 +4,12 @@ import { NextAuthOptions } from 'next-auth';
 import NextAuth from 'next-auth/next';
 import GoogleProvider from 'next-auth/providers/google';
 import EmailProvider from 'next-auth/providers/email';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/src/lib/prisma';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { createHash } from 'crypto';
 import { Adapter, AdapterUser } from 'next-auth/adapters';
-import { withPrisma } from '@/lib/prisma';
+import { withPrisma } from '@/src/lib/prisma';
 
 // AWS SESクライアントの設定
 const sesClient = new SESClient({

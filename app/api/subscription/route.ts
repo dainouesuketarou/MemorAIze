@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { stripe, STRIPE_PRICE_IDS } from '@/lib/stripe';
-import { prisma } from '@/lib/prisma';
+import { stripe, STRIPE_PRICE_IDS } from '@/src/lib/stripe';
+import { prisma } from '@/src/lib/prisma';
 // SubscriptionStatus, SubscriptionPlan はここでは直接使用しない
 import StripeType from 'stripe';
 // getAuthSessionは未使用なので削除またはコメントアウト
