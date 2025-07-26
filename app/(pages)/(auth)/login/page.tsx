@@ -56,27 +56,41 @@ export default function LoginPage() {
     console.log('オンボーディング状態をチェック開始');
 
     try {
-      const response = await fetch('/api/auth/onboarding/status');
-      const data = await response.json();
-
-      // ログイン履歴を記録（日本時間で記録）
-      const now = new Date();
-      const jpNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-      await fetch('/api/auth/login-history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          loginAt: jpNow.toISOString(),
+      // オンボーディング状態チェックとログイン履歴記録を並列実行
+      const [onboardingResponse] = await Promise.allSettled([
+        fetch('/api/auth/onboarding/status', {
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
         }),
-      });
+        // ログイン履歴記録（バックグラウンドで実行、結果を待たない）
+        fetch('/api/auth/login-history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            loginAt: new Date().toISOString(),
+          }),
+        }).catch(() => {
+          // ログイン履歴記録が失敗しても処理を継続
+          console.log('ログイン履歴記録に失敗（処理を継続）');
+        }),
+      ]);
 
-      if (!data.isOnboarded) {
-        console.log('オンボーディング未完了、オンボーディングページに遷移');
-        router.push('/onboarding');
+      if (onboardingResponse.status === 'fulfilled') {
+        const data = await onboardingResponse.value.json();
+
+        if (!data.isOnboarded) {
+          console.log('オンボーディング未完了、オンボーディングページに遷移');
+          router.push('/onboarding');
+        } else {
+          console.log('オンボーディング完了、ダッシュボードに遷移');
+          router.push('/dashboard');
+        }
       } else {
-        console.log('オンボーディング完了、ダッシュボードに遷移');
+        // オンボーディング状態チェックが失敗した場合はダッシュボードに遷移
+        console.log('オンボーディング状態チェック失敗、ダッシュボードに遷移');
         router.push('/dashboard');
       }
     } catch (error) {
@@ -140,13 +154,15 @@ export default function LoginPage() {
 
       // セッション確認を待機（短時間）
       let retryCount = 0;
-      const maxRetries = 3;
+      const maxRetries = 2; // 2回に削減
 
       while (retryCount < maxRetries) {
         try {
-          const sessionData = await fetch('/api/auth/session').then((res) =>
-            res.json(),
-          );
+          const sessionData = await fetch('/api/auth/session', {
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          }).then((res) => res.json());
 
           if (sessionData?.user?.email) {
             console.log('セッション確認成功、オンボーディング状態をチェック');
@@ -155,7 +171,7 @@ export default function LoginPage() {
           }
 
           retryCount++;
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 50)); // 50msに短縮
         } catch (error) {
           console.error('セッション確認エラー:', error);
           retryCount++;
