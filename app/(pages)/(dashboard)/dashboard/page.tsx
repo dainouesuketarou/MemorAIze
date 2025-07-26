@@ -99,8 +99,8 @@ export default function DashboardPage() {
     return null; // リダイレクトはmiddlewareで処理
   }
 
-  // データローディング中の表示
-  if (dataLoading || !user.id) {
+  // データローディング中の表示（Reduxにデータがある場合は表示）
+  if (dataLoading || (!user.id && !reduxDecks.length && !reduxGroups.length)) {
     return (
       <DashboardShell groupMode={groupMode} setGroupMode={setGroupMode}>
         <div className="flex items-center justify-center min-h-[400px]">

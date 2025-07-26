@@ -39,6 +39,15 @@ export const useUserAllData = () => {
         return;
       }
 
+      // Reduxにデータが既に存在する場合はAPIリクエストをスキップ
+      const hasExistingData =
+        userState.id && groups.length > 0 && decks.length > 0;
+      if (hasExistingData) {
+        console.log('Reduxにデータが存在するためAPIリクエストをスキップ');
+        setInitialized(true);
+        return;
+      }
+
       setLoading(true);
       try {
         // セッション情報をReduxに保存
@@ -117,7 +126,16 @@ export const useUserAllData = () => {
     };
 
     fetchAll();
-  }, [status, session, userState.id, initialized, loading, dispatch]);
+  }, [
+    status,
+    session,
+    userState.id,
+    groups.length,
+    decks.length,
+    initialized,
+    loading,
+    dispatch,
+  ]);
 
   // ログインしていない場合は初期状態を返す
   if (status === 'unauthenticated') {
