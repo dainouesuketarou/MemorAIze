@@ -213,189 +213,191 @@ export default function DeckDetailsPage() {
         scrolled={scrolled}
       />
       <main className="flex-1">
-        <DashboardHeader
-          heading={
-            <span className="flex items-center">
-              <MathRenderer text={deckData.title} />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-1 h-8 w-8"
-                onClick={() => setEditOpen(true)}
-              >
-                <Edit2 className="h-4 w-4" />
-              </Button>
-            </span>
-          }
-          description={<MathRenderer text={deckData.description ?? ''} />}
-        >
-          <Link href="/dashboard">
-            <Button variant="outline" className="h-10">
-              <Home className="mr-2 h-4 w-4" />
-              ダッシュボードへ
-            </Button>
-          </Link>
-        </DashboardHeader>
-
-        <div className="grid gap-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* 学習状況 */}
-            <Card className="shadow-lg rounded-2xl border-0">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-lg font-bold text-primary">
-                    学習状況
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={
-                        pieProgressMode === 'all' ? 'default' : 'outline'
-                      }
-                      size="sm"
-                      onClick={() => setPieProgressMode('all')}
-                      className="h-7 text-xs"
-                    >
-                      全カード
-                    </Button>
-                    <Button
-                      variant={
-                        pieProgressMode === 'learned' ? 'default' : 'outline'
-                      }
-                      size="sm"
-                      onClick={() => setPieProgressMode('learned')}
-                      className="h-7 text-xs"
-                    >
-                      学習済み
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center">
-                <PieChart width={220} height={220}>
-                  <Pie
-                    data={pieData}
-                    cx={110}
-                    cy={110}
-                    innerRadius={70}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-                <div className="mt-6 space-y-3 w-full">
-                  <div className="flex items-center justify-between text-base">
-                    <div className="flex items-center">
-                      <span className="inline-block w-4 h-4 rounded-full bg-[#4ade80] mr-2" />
-                      <span>覚えた</span>
-                    </div>
-                    <span className="font-bold text-[#4ade80]">
-                      {pieProgressMode === 'all'
-                        ? `${pieMasteredPercentage}%`
-                        : `${learnedMasteredPercentage}%`}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-base">
-                    <div className="flex items-center">
-                      <span className="inline-block w-4 h-4 rounded-full bg-[#f87171] mr-2" />
-                      <span>苦手</span>
-                    </div>
-                    <span className="font-bold text-[#f87171]">
-                      {pieProgressMode === 'all'
-                        ? `${pieStrugglingPercentage}%`
-                        : `${learnedStrugglingPercentage}%`}
-                    </span>
-                  </div>
-                  {pieProgressMode === 'all' && (
-                    <div className="flex items-center justify-between text-base">
-                      <div className="flex items-center">
-                        <span className="inline-block w-4 h-4 rounded-full bg-[#9ca3af] mr-2" />
-                        <span>未学習</span>
-                      </div>
-                      <span className="font-bold text-[#9ca3af]">
-                        {pieUnlearnedPercentage}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 学習の推移 */}
-            <Card className="shadow-lg rounded-2xl border-0">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-lg font-bold text-primary">
-                    暗記レベルの推移（直近15回）
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="w-full h-[320px]">
-                  <ResponsiveContainer width="100%" height={320}>
-                    <RechartsLineChart
-                      data={chartData.slice(-15)}
-                      margin={{ top: 20, right: 40, bottom: 20, left: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fontSize: 12 }}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        domain={[0, 100]}
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(value) => `${value}%`}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => [`${value}%`, '進捗率']}
-                        labelFormatter={(label) => `学習日時: ${label}`}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="progress"
-                        stroke="#8b5cf6"
-                        strokeWidth={3}
-                        dot={{
-                          r: 5,
-                          stroke: '#8b5cf6',
-                          strokeWidth: 2,
-                          fill: '#fff',
-                        }}
-                        activeDot={{ r: 8 }}
-                      />
-                    </RechartsLineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* アクションボタン */}
-          <div className="flex flex-col items-center sm:flex-row justify-center gap-6 mt-8">
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-[90vw] max-w-sm text-base py-6 rounded-xl shadow"
-              onClick={() => router.push(`/deck/${deckId}/cards`)}
-            >
-              <BookOpen className="mr-2 h-5 w-5" />
-              カードリスト
-            </Button>
-            <Link href={`/study/${deckId}`} className="w-[90vw] max-w-sm">
-              <Button
-                size="lg"
-                className="w-full text-base py-6 rounded-xl shadow bg-primary text-white hover:bg-primary/90"
-              >
-                <LineChart className="mr-2 h-5 w-5" />
-                学習開始
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+          <DashboardHeader
+            heading={
+              <span className="flex items-center">
+                <MathRenderer text={deckData.title} />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="ml-1 h-8 w-8"
+                  onClick={() => setEditOpen(true)}
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </span>
+            }
+            description={<MathRenderer text={deckData.description ?? ''} />}
+          >
+            <Link href="/dashboard">
+              <Button variant="outline" className="h-10">
+                <Home className="mr-2 h-4 w-4" />
+                ダッシュボードへ
               </Button>
             </Link>
+          </DashboardHeader>
+
+          <div className="grid gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* 学習状況 */}
+              <Card className="shadow-lg rounded-2xl border-0">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-lg font-bold text-primary">
+                      学習状況
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={
+                          pieProgressMode === 'all' ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        onClick={() => setPieProgressMode('all')}
+                        className="h-7 text-xs"
+                      >
+                        全カード
+                      </Button>
+                      <Button
+                        variant={
+                          pieProgressMode === 'learned' ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        onClick={() => setPieProgressMode('learned')}
+                        className="h-7 text-xs"
+                      >
+                        学習済み
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center">
+                  <PieChart width={220} height={220}>
+                    <Pie
+                      data={pieData}
+                      cx={110}
+                      cy={110}
+                      innerRadius={70}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                  <div className="mt-6 space-y-3 w-full">
+                    <div className="flex items-center justify-between text-base">
+                      <div className="flex items-center">
+                        <span className="inline-block w-4 h-4 rounded-full bg-[#4ade80] mr-2" />
+                        <span>覚えた</span>
+                      </div>
+                      <span className="font-bold text-[#4ade80]">
+                        {pieProgressMode === 'all'
+                          ? `${pieMasteredPercentage}%`
+                          : `${learnedMasteredPercentage}%`}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-base">
+                      <div className="flex items-center">
+                        <span className="inline-block w-4 h-4 rounded-full bg-[#f87171] mr-2" />
+                        <span>苦手</span>
+                      </div>
+                      <span className="font-bold text-[#f87171]">
+                        {pieProgressMode === 'all'
+                          ? `${pieStrugglingPercentage}%`
+                          : `${learnedStrugglingPercentage}%`}
+                      </span>
+                    </div>
+                    {pieProgressMode === 'all' && (
+                      <div className="flex items-center justify-between text-base">
+                        <div className="flex items-center">
+                          <span className="inline-block w-4 h-4 rounded-full bg-[#9ca3af] mr-2" />
+                          <span>未学習</span>
+                        </div>
+                        <span className="font-bold text-[#9ca3af]">
+                          {pieUnlearnedPercentage}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 学習の推移 */}
+              <Card className="shadow-lg rounded-2xl border-0">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-lg font-bold text-primary">
+                      暗記レベルの推移（直近15回）
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="w-full h-[320px]">
+                    <ResponsiveContainer width="100%" height={320}>
+                      <RechartsLineChart
+                        data={chartData.slice(-15)}
+                        margin={{ top: 20, right: 40, bottom: 20, left: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 12 }}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          domain={[0, 100]}
+                          tick={{ fontSize: 12 }}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                        <Tooltip
+                          formatter={(value: number) => [`${value}%`, '進捗率']}
+                          labelFormatter={(label) => `学習日時: ${label}`}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="progress"
+                          stroke="#8b5cf6"
+                          strokeWidth={3}
+                          dot={{
+                            r: 5,
+                            stroke: '#8b5cf6',
+                            strokeWidth: 2,
+                            fill: '#fff',
+                          }}
+                          activeDot={{ r: 8 }}
+                        />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* アクションボタン */}
+            <div className="flex flex-col items-center sm:flex-row justify-center gap-6 mt-8">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-[90vw] max-w-sm text-base py-6 rounded-xl shadow"
+                onClick={() => router.push(`/deck/${deckId}/cards`)}
+              >
+                <BookOpen className="mr-2 h-5 w-5" />
+                カードリスト
+              </Button>
+              <Link href={`/study/${deckId}`} className="w-[90vw] max-w-sm">
+                <Button
+                  size="lg"
+                  className="w-full text-base py-6 rounded-xl shadow bg-primary text-white hover:bg-primary/90"
+                >
+                  <LineChart className="mr-2 h-5 w-5" />
+                  学習開始
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 
