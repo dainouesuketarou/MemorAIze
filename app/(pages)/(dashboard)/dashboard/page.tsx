@@ -128,40 +128,43 @@ export default function DashboardPage() {
           </Link>
         </DashboardHeader>
 
-        <div className="grid gap-4 md:grid-cols-[4fr_1fr]">
-          <div className="space-y-4">
-            <DeckFilter
-              filter={reduxFilter}
-              setFilter={(filter) =>
-                dispatch(setFilter(filter) as unknown as AnyAction)
-              }
-              sort={reduxSort}
-              setSort={(sort) =>
-                dispatch(setSort(sort) as unknown as AnyAction)
-              }
-            />
-            <DeckList
-              decks={filteredAndSortedDecks}
-              groupMode={groupMode}
-              groups={reduxGroups}
-              setDecks={(decks: DeckWithCardsAndGroups[]) =>
-                dispatch(setDecks(decks))
-              }
-            />
-          </div>
-
-          <Sidebar
-            groups={reduxGroups}
-            setGroups={(groups) =>
-              dispatch(setGroups(groups as Group[]) as unknown as AnyAction)
+        <div className="space-y-4">
+          <DeckFilter
+            filter={reduxFilter}
+            setFilter={(filter) =>
+              dispatch(setFilter(filter) as unknown as AnyAction)
             }
-            selectedGroup={selectedGroup}
-            setSelectedGroup={setSelectedGroup}
-            newGroupName={newGroupName}
-            setNewGroupName={setNewGroupName}
-            showGroupInput={showGroupInput}
-            setShowGroupInput={setShowGroupInput}
+            sort={reduxSort}
+            setSort={(sort) => dispatch(setSort(sort) as unknown as AnyAction)}
           />
+
+          <div className="flex gap-4">
+            <div className="flex-1 min-w-0">
+              <DeckList
+                decks={filteredAndSortedDecks}
+                groupMode={groupMode}
+                groups={reduxGroups}
+                setDecks={(decks: DeckWithCardsAndGroups[]) =>
+                  dispatch(setDecks(decks))
+                }
+              />
+            </div>
+
+            <div className="w-1/4 flex-shrink-0">
+              <Sidebar
+                groups={reduxGroups}
+                setGroups={(groups) =>
+                  dispatch(setGroups(groups as Group[]) as unknown as AnyAction)
+                }
+                selectedGroup={selectedGroup}
+                setSelectedGroup={setSelectedGroup}
+                newGroupName={newGroupName}
+                setNewGroupName={setNewGroupName}
+                showGroupInput={showGroupInput}
+                setShowGroupInput={setShowGroupInput}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </DashboardShell>
