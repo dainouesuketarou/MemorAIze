@@ -162,7 +162,7 @@ export default function CardsPage() {
   };
 
   return (
-    <DashboardShell groupMode={groupMode} setGroupMode={setGroupMode}>
+    <DashboardShell>
       <DashboardHeader
         heading={<div className="flex items-center gap-2">カード一覧</div>}
         description="暗記カードの管理と編集を行います"

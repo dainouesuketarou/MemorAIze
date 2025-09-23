@@ -1,0 +1,33 @@
+# 開発用Dockerfile (Supabase + Vercel環境用)
+FROM node:18-alpine
+
+# 必要なシステムパッケージをインストール
+RUN apk add --no-cache libc6-compat
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# パッケージマネージャーをpnpmに設定
+RUN npm install -g pnpm
+
+# 依存関係ファイルをコピー
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# 依存関係をインストール（frozen-lockfileを無効化）
+RUN pnpm install --no-frozen-lockfile
+
+# アプリケーションコードをコピー
+COPY . .
+
+# Prismaクライアントを生成
+RUN pnpm prisma generate
+
+# 開発用ポートを公開
+EXPOSE 3000
+
+# 環境変数を設定
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# 開発サーバーを起動
+CMD ["pnpm", "dev"]

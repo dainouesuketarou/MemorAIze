@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import userReducer from './slices/userSlice';
 import deckReducer from './slices/deckSlice';
 import groupReducer from './slices/groupSlice';
+import groupModeReducer from './slices/groupModeSlice';
 import aiGenerationLimitReducer from './slices/aiGenerationLimitSlice';
 import studyProgressReducer from './slices/studyProgressSlice';
 import studyReducer from './slices/studySlice';
@@ -13,6 +14,7 @@ export const store = configureStore({
     user: userReducer,
     deck: deckReducer,
     group: groupReducer,
+    groupMode: groupModeReducer,
     aiGenerationLimit: aiGenerationLimitReducer,
     studyProgress: studyProgressReducer,
     study: studyReducer,

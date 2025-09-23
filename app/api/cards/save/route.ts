@@ -1,69 +1,62 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { prisma } from '@/src/lib/prisma';
+import { container } from '@/src/infrastructure/container/di-container';
+import { z } from 'zod';
 
-interface SaveRequest {
-  deckId: string;
-  title?: string;
-  cards: Array<{ front: string; back: string }>;
-}
+const saveCardsSchema = z.object({
+  deckId: z.string().min(1, 'デッキIDは必須です'),
+  cards: z
+    .array(
+      z.object({
+        front: z.string().min(1, 'カードの表は必須です'),
+        back: z.string().min(1, 'カードの裏は必須です'),
+      }),
+    )
+    .min(1, '少なくとも1つのカードが必要です'),
+});
 
 export async function POST(req: Request) {
-  // 認証チェック
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401 },
-    );
-  }
-
-  let body: SaveRequest;
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON' },
-      { status: 400 },
-    );
-  }
-
-  const { deckId, cards } = body;
-
-  console.log('cards', cards);
-
-  // バリデーション
-  if (
-    typeof deckId !== 'string' ||
-    !Array.isArray(cards) ||
-    cards.length === 0
-  ) {
-    return NextResponse.json(
-      { success: false, error: 'deckId と cards は必須です' },
-      { status: 400 },
-    );
-  }
-  for (const c of cards) {
-    if (!c.front?.trim() || !c.back?.trim()) {
+    // 認証チェック
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { success: false, error: 'front/back が空です' },
+        { success: false, error: '認証が必要です' },
+        { status: 401 },
+      );
+    }
+
+    const body = await req.json();
+    const validatedData = saveCardsSchema.parse(body);
+
+    const saveCardsUseCase = container.getSaveCardsUseCase();
+    const result = await saveCardsUseCase.execute({
+      deckId: validatedData.deckId,
+      cards: validatedData.cards,
+    });
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error },
         { status: 400 },
       );
     }
+
+    return NextResponse.json({
+      success: true,
+      data: result.cards,
+    });
+  } catch (error) {
+    console.error('Error saving cards:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'カードの保存に失敗しました',
+        details:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
+      },
+      { status: 400 },
+    );
   }
-
-  // カードを一括作成
-  await prisma.card.createMany({
-    data: cards.map((c, index) => ({
-      deckId,
-      front: c.front.trim(),
-      back: c.back.trim(),
-      status: 'UNLEARNED',
-      favorite: false,
-      order: index,
-    })),
-  });
-
-  return NextResponse.json({ success: true });
 }

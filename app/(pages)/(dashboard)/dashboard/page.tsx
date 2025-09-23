@@ -2,7 +2,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Group } from '@prisma/client';
+// import { Group } from '@prisma/client'; // DTOベースの型を使用するため削除
+import { GroupWithDetails } from '@/src/types/deck';
 import { DashboardHeader } from '@/src/components/dashboard/header';
 import { DashboardShell } from '@/src/components/dashboard/shell';
 import { DeckList } from '@/src/components/dashboard/deck-list';
@@ -52,42 +53,6 @@ export default function DashboardPage() {
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [newGroupName, setNewGroupName] = useState<string>('');
   const [showGroupInput, setShowGroupInput] = useState<boolean>(false);
-  const [groupMode, setGroupMode] = useState<boolean>(false);
-
-  // フィルタリングとソートの適用（Hooksは早期リターンの前に配置）
-  const filteredAndSortedDecks = useMemo(() => {
-    const filtered =
-      selectedGroup === 'all'
-        ? reduxDecks
-        : reduxDecks.filter((d) =>
-            d.groups?.some((g) => g.id === selectedGroup),
-          );
-
-    return [...filtered]
-      .filter((deck) => {
-        if (reduxFilter === 'all') return true;
-        if (reduxFilter === 'inProgress')
-          return deck.progress && deck.progress > 0 && deck.progress < 1;
-        if (reduxFilter === 'completed') return deck.progress === 1;
-        if (reduxFilter === 'notStarted')
-          return !deck.progress || deck.progress === 0;
-        return true;
-      })
-      .sort((a, b) => {
-        if (reduxSort === 'recent') {
-          const bTime = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
-          const aTime = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
-          return bTime - aTime;
-        }
-        if (reduxSort === 'alphabetical') {
-          return a.title.localeCompare(b.title);
-        }
-        if (reduxSort === 'cardCount') {
-          return b.cardCount - a.cardCount;
-        }
-        return 0;
-      });
-  }, [reduxDecks, selectedGroup, reduxFilter, reduxSort]);
 
   // セッションのローディング中は何も表示しない
   if (status === 'loading') {
@@ -102,7 +67,7 @@ export default function DashboardPage() {
   // データローディング中の表示
   if (dataLoading || !user.id) {
     return (
-      <DashboardShell groupMode={groupMode} setGroupMode={setGroupMode}>
+      <DashboardShell>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex flex-col items-center space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -114,7 +79,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <DashboardShell groupMode={groupMode} setGroupMode={setGroupMode}>
+    <DashboardShell>
       <div className="space-y-6">
         <DashboardHeader
           heading="マイデッキ"
@@ -140,22 +105,11 @@ export default function DashboardPage() {
 
           <div className="flex gap-4">
             <div className="flex-1 min-w-0">
-              <DeckList
-                decks={filteredAndSortedDecks}
-                groupMode={groupMode}
-                groups={reduxGroups}
-                setDecks={(decks: DeckWithCardsAndGroups[]) =>
-                  dispatch(setDecks(decks))
-                }
-              />
+              <DeckList selectedGroup={selectedGroup} />
             </div>
 
             <div className="w-1/4 flex-shrink-0">
               <Sidebar
-                groups={reduxGroups}
-                setGroups={(groups) =>
-                  dispatch(setGroups(groups as Group[]) as unknown as AnyAction)
-                }
                 selectedGroup={selectedGroup}
                 setSelectedGroup={setSelectedGroup}
                 newGroupName={newGroupName}

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { z } from 'zod';
-import { getUniqueShareCode } from './share/route';
+import { container } from '@/src/infrastructure/container/di-container';
 
 const createDeckSchema = z.object({
   title: z.string().min(1),
@@ -16,8 +15,6 @@ const createDeckSchema = z.object({
   groupIds: z.array(z.string()).optional(),
 });
 
-const prisma = new PrismaClient();
-
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -28,36 +25,27 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validatedData = createDeckSchema.parse(body);
 
-    const deck = await prisma.deck.create({
-      data: {
-        title: validatedData.title,
-        userId: session.user.id,
-        cardCount: validatedData.cards.length,
-        progress: 0,
-        cards: {
-          create: validatedData.cards.map((card, index) => ({
-            front: card.front,
-            back: card.back,
-            order: index,
-            status: 'UNLEARNED',
-          })),
-        },
-        groups: validatedData.groupIds
-          ? {
-              connect: validatedData.groupIds.map((id) => ({ id })),
-            }
-          : undefined,
-        shareCode: await getUniqueShareCode(prisma),
-      },
-      include: {
-        cards: true,
-        groups: true,
-      },
+    // ユースケースを実行
+    const createDeckUseCase = container.getCreateDeckUseCase();
+    const result = await createDeckUseCase.execute({
+      title: validatedData.title,
+      cards: validatedData.cards,
+      userId: session.user.id,
+      groupIds: validatedData.groupIds,
     });
+
+    if (!result.success) {
+      return NextResponse.json(
+        {
+          error: result.error,
+        },
+        { status: 400 },
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      data: deck,
+      data: result.deck,
     });
   } catch (error) {
     console.error('Error creating deck:', error);
@@ -79,23 +67,8 @@ export async function GET() {
   }
 
   try {
-    const decks = await prisma.deck.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      include: {
-        cards: {
-          select: {
-            id: true,
-            status: true,
-          },
-        },
-        groups: true,
-      },
-      orderBy: {
-        lastStudied: 'desc',
-      },
-    });
+    const deckRepository = container.getDeckRepository();
+    const decks = await deckRepository.findByUserId(session.user.id);
 
     return NextResponse.json(decks);
   } catch (error) {

@@ -1,17 +1,11 @@
-import { Deck, Group } from '@prisma/client';
+import { GetDecksResponse, GetGroupsResponse } from '@/src/dto';
 
 /**
- * フロント／DeckList／DashboardShell 間で共通利用する型
+ * DTOベースのデッキ型（フロントエンド用）
  */
-export type DeckWithCardsAndGroups = Omit<Deck, 'lastStudied'> & {
-  lastStudied: string | null;
-  /** カードのステータス一覧 */
-  cards: { id: string; status: string }[];
-  /** 紐づくグループ一覧 */
-  groups: Group[];
-  /** 学習履歴 */
-  progressHistory: {
-    progress: number;
-    createdAt: string;
-  }[];
-};
+export type DeckWithCardsAndGroups = NonNullable<GetDecksResponse['data']>[0];
+
+/**
+ * DTOベースのグループ型（フロントエンド用）
+ */
+export type GroupWithDetails = NonNullable<GetGroupsResponse['data']>[0];

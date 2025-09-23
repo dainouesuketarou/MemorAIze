@@ -31,14 +31,17 @@ export const GroupModal = ({ isOpen, onClose, deckId }: GroupModalProps) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to group deck');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'グループの作成に失敗しました');
       }
 
       toast.success('グループを作成しました');
       router.refresh();
       onClose();
     } catch (error) {
-      toast.error('グループの作成に失敗しました');
+      const errorMessage =
+        error instanceof Error ? error.message : 'グループの作成に失敗しました';
+      toast.error(errorMessage);
     }
   };
 

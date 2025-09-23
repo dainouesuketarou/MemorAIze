@@ -1,68 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { container } from '@/src/infrastructure/container/di-container';
+import { z } from 'zod';
 
-const prisma = new PrismaClient();
+const deleteCardSchema = z.object({
+  deckId: z.string().min(1, 'デッキIDは必須です'),
+});
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { cardId: string } },
 ) {
   try {
-    const { cardId } = params;
-    const { deckId } = await req.json();
+    const body = await req.json();
+    const validatedData = deleteCardSchema.parse(body);
 
-    // カードの存在確認
-    const card = await prisma.card.findUnique({
-      where: { id: cardId },
+    const deleteCardUseCase = container.getDeleteCardUseCase();
+    const result = await deleteCardUseCase.execute({
+      cardId: params.cardId,
+      deckId: validatedData.deckId,
     });
 
-    if (!card) {
-      return NextResponse.json(
-        { error: 'カードが見つかりません' },
-        { status: 404 },
-      );
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // トランザクションでカード削除とデッキの更新を実行
-    await prisma.$transaction(async (tx) => {
-      // デッキの情報を取得（カード削除前）
-      const deck = await tx.deck.findUnique({
-        where: { id: deckId },
-        include: {
-          cards: true,
-        },
-      });
-
-      if (!deck) {
-        throw new Error('デッキが見つかりません');
-      }
-
-      // カードの削除
-      await tx.card.delete({
-        where: { id: cardId },
-      });
-
-      // デッキの更新
-      const totalCards = deck.cards.length - 1; // 削除するカードを除いた数
-      const masteredCount = deck.cards.filter(
-        (card) => card.status === 'MASTERED',
-      ).length;
-      const progress = totalCards > 0 ? masteredCount / totalCards : 0;
-
-      await tx.deck.update({
-        where: { id: deckId },
-        data: {
-          cardCount: totalCards,
-          progress: progress,
-        },
-      });
-    });
-
     return NextResponse.json({ success: true });
-  } catch (e) {
-    console.error('[CARD_DELETE]', e);
+  } catch (error) {
+    console.error('[CARD_DELETE]', error);
     return NextResponse.json(
-      { error: 'カード削除エラー', detail: String(e) },
+      { error: 'カード削除エラー', detail: String(error) },
       { status: 500 },
     );
   }

@@ -1,6 +1,7 @@
 'use client';
 
-import { Group } from '@prisma/client';
+// import { Group } from '@prisma/client'; // DTOベースの型を使用するため削除
+import { GroupWithDetails } from '@/src/types/deck';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/src/components/ui/button';
 import { Skeleton } from '@/src/components/ui/skeleton';
@@ -22,10 +23,9 @@ import {
   DropdownMenuTrigger,
 } from '@/src/components/ui/dropdown-menu';
 import { MoreVertical, Trash2 } from 'lucide-react';
+import { transformGroupData } from '@/src/lib/utils/data-transform';
 
 interface SidebarProps {
-  groups: Group[];
-  setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
   selectedGroup: string;
   setSelectedGroup: (group: string) => void;
   newGroupName: string;
@@ -35,8 +35,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  groups,
-  setGroups,
   selectedGroup,
   setSelectedGroup,
   newGroupName,
@@ -49,12 +47,7 @@ export function Sidebar({
   const [isLoading, setIsLoading] = useState(false);
   const reduxGroups = useSelector((state: RootState) => state.group.groups);
 
-  // グループの取得は不要（Reduxから取得）
-  useEffect(() => {
-    if (session?.user?.id && reduxGroups.length > 0) {
-      setGroups(reduxGroups);
-    }
-  }, [session?.user?.id, reduxGroups, setGroups]);
+  // Reduxから直接データを取得するため、useEffectは不要
 
   /* ---------------「すべて」タブを挿入 --------------- */
   const allTab = useMemo(
@@ -64,15 +57,30 @@ export function Sidebar({
         name: 'すべて',
         description: null,
         userId: session?.user?.id || '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Group),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as GroupWithDetails),
     [session?.user?.id],
   );
 
   const displayGroups = useMemo(
     () => [allTab, ...reduxGroups],
     [allTab, reduxGroups],
+  );
+
+  // スケルトンUIをメモ化
+  const skeletonItems = useMemo(
+    () =>
+      Array.from({ length: 3 }, (_, i) => (
+        <div
+          key={`skeleton-${i}`}
+          className="relative w-24 min-h-[2.5rem] bg-muted animate-pulse"
+          style={{
+            clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
+          }}
+        />
+      )),
+    [],
   );
 
   /* ───────────────── 追加 ───────────────── */
@@ -98,11 +106,17 @@ export function Sidebar({
       });
 
       if (!response.ok) {
-        throw new Error('グループの作成に失敗しました');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'グループの作成に失敗しました');
       }
 
-      const newGroup = await response.json();
-      dispatch(setGroups([...reduxGroups, newGroup]) as unknown as AnyAction);
+      const responseData = await response.json();
+      // 新しいDTOレスポンス形式に対応
+      const rawGroup = responseData.success ? responseData.data : responseData;
+      const transformedGroup = transformGroupData(rawGroup);
+      dispatch(
+        setGroups([...reduxGroups, transformedGroup]) as unknown as AnyAction,
+      );
       setNewGroupName('');
       setShowGroupInput(false);
       toast.success('グループを作成しました');
@@ -129,7 +143,8 @@ export function Sidebar({
         });
 
         if (!response.ok) {
-          throw new Error('グループの削除に失敗しました');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'グループの削除に失敗しました');
         }
 
         dispatch(deleteGroup(groupId) as unknown as AnyAction);
@@ -180,66 +195,62 @@ export function Sidebar({
 
   return (
     <aside className="flex flex-col items-center gap-2 py-4 pl-4">
-      {isLoading
-        ? // ローディング中のスケルトンUI
-          Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="relative w-24 min-h-[2.5rem] bg-muted animate-pulse"
-              style={{
-                clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
-              }}
-            />
-          ))
-        : displayGroups.map((g: Group) => {
-            const active = selectedGroup === g.id;
-            return (
-              <div key={g.id} className="relative group">
-                <button
-                  onClick={() => handleGroupSelect(g.id)}
-                  className={`relative w-24 min-h-[2.5rem] pl-4 pr-3 flex items-center text-sm font-medium transition
-                    ${
-                      active
-                        ? 'bg-primary text-white shadow-lg'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/70'
-                    }
-                  `}
-                  style={{
-                    clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
-                  }}
-                >
-                  <span className="line-clamp-2 text-left">{g.name}</span>
-                  <span
-                    className={`absolute left-0 top-0 h-full w-1 rounded-l
-                      ${active ? 'bg-white/70' : 'bg-primary/40'}
+      <div className="flex flex-col items-center gap-2">
+        {isLoading
+          ? // ローディング中のスケルトンUI
+            skeletonItems
+          : displayGroups
+              .filter((g) => g && g.id)
+              .map((g: GroupWithDetails) => {
+                const active = selectedGroup === g.id;
+                return (
+                  <div key={g.id} className="relative group">
+                    <button
+                      onClick={() => handleGroupSelect(g.id)}
+                      className={`relative w-24 min-h-[2.5rem] pl-4 pr-3 flex items-center text-sm font-medium transition
+                      ${
+                        active
+                          ? 'bg-primary text-white shadow-lg'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }
                     `}
-                  />
-                </button>
-                {g.id !== 'all' && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={() => handleDeleteGroup(g.id)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        削除
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            );
-          })}
+                      style={{
+                        clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
+                      }}
+                    >
+                      <span className="line-clamp-2 text-left">{g.name}</span>
+                      <span
+                        className={`absolute left-0 top-0 h-full w-1 rounded-l
+                        ${active ? 'bg-white/70' : 'bg-primary/40'}
+                      `}
+                      />
+                    </button>
+                    {g.id !== 'all' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => handleDeleteGroup(g.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            削除
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                );
+              })}
+      </div>
 
       {/* ───── 新規グループ入力 or 追加ボタン ───── */}
       {showGroupInput ? (

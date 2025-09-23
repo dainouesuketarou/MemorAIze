@@ -247,10 +247,13 @@ export function ManualCreateForm({ groups }: ManualCreateFormProps) {
         return;
       }
 
-      const json = await res.json();
+      const responseData = await res.json();
+      // 新しいDTOレスポンス形式に対応
+      const json = responseData.success ? responseData.data : responseData;
+
       // Reduxストアを更新
-      if (json.data) {
-        dispatch(addDeck(json.data));
+      if (json) {
+        dispatch(addDeck(json));
       }
 
       setIsLoading(false);

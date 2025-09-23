@@ -16,7 +16,7 @@ function generateShareCode(length = 6) {
 }
 
 // 共有IDの重複をチェックして、重複しない共有IDを生成する
-export async function getUniqueShareCode(prisma: PrismaClient) {
+async function getUniqueShareCode(prisma: PrismaClient) {
   let code;
   let exists = true;
   while (exists) {

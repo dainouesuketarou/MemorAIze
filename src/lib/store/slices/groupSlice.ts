@@ -1,8 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { Group } from '@prisma/client';
+import { GroupWithDetails } from '@/src/types/deck';
 
 interface GroupState {
-  groups: Group[];
+  groups: GroupWithDetails[];
   isLoading: boolean;
   error: string | null;
   lastFetched: number | null;

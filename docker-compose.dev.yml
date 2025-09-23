@@ -1,0 +1,77 @@
+services:
+  # Next.js アプリケーション (開発モード) - Supabase使用
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: memorize-app-dev
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GITHUB_ID=${GITHUB_ID}
+      - GITHUB_SECRET=${GITHUB_SECRET}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    networks:
+      - memorize-network
+    # 開発用のオーバーライド
+    command: pnpm dev
+    # 外部ネットワークアクセスを許可
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  # データベースマイグレーション用のワンタイムサービス
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: memorize-migrate-dev
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+    command: sh -c "pnpm prisma migrate deploy && pnpm prisma generate"
+    networks:
+      - memorize-network
+    # 外部ネットワークアクセスを許可
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    profiles:
+      - tools
+
+  # データベースシード用のワンタイムサービス
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: memorize-seed-dev
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+    command: sh -c "pnpm prisma db seed"
+    networks:
+      - memorize-network
+    # 外部ネットワークアクセスを許可
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    profiles:
+      - tools
+
+networks:
+  memorize-network:
+    driver: bridge
+    external: false

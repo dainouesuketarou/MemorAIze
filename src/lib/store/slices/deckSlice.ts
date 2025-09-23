@@ -4,8 +4,7 @@ import {
   ActionCreatorWithPayload,
   createAsyncThunk,
 } from '@reduxjs/toolkit';
-import { Group } from '@prisma/client';
-import { DeckWithCardsAndGroups } from '@/src/types/deck';
+import { DeckWithCardsAndGroups, GroupWithDetails } from '@/src/types/deck';
 
 export interface Card {
   id: string;

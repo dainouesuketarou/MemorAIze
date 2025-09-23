@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { container } from '@/src/infrastructure/container/di-container';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,56 +11,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // トランザクションで一括処理
-    const result = await prisma.$transaction(async (tx) => {
-      // カード作成
-      const card = await tx.card.create({
-        data: {
-          deckId: typeof deckId === 'string' ? deckId : String(deckId),
-          front,
-          back,
-          status: 'UNLEARNED', // 新規カードは未学習状態
-          order: 0, // 新規カードは最後に追加
-        },
-      });
-
-      // StudyHistory作成
-      await tx.studyHistory.create({
-        data: {
-          deckId: typeof deckId === 'string' ? deckId : String(deckId),
-          progress: 0, // 新規カードは進捗0
-        },
-      });
-
-      // Deckの進捗度更新
-      const deck = await tx.deck.findUnique({
-        where: { id: typeof deckId === 'string' ? deckId : String(deckId) },
-        include: {
-          cards: true,
-        },
-      });
-
-      if (deck) {
-        // 全カード数に対する覚えたカードの割合を計算
-        const totalCards = deck.cards.length;
-        const masteredCount = deck.cards.filter(
-          (card) => card.status === 'MASTERED',
-        ).length;
-        const progress = totalCards > 0 ? masteredCount / totalCards : 0;
-
-        await tx.deck.update({
-          where: { id: deck.id },
-          data: {
-            cardCount: totalCards,
-            progress: progress,
-          },
-        });
-      }
-
-      return card;
+    // ユースケースを実行
+    const addCardUseCase = container.getAddCardUseCase();
+    const result = await addCardUseCase.execute({
+      deckId,
+      front,
+      back,
     });
 
-    return NextResponse.json(result);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+
+    return NextResponse.json(result.card);
   } catch (e) {
     return NextResponse.json(
       { error: 'カード追加エラー', detail: String(e) },

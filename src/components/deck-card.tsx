@@ -35,13 +35,16 @@ export const DeckCard = ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete deck');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'デッキの削除に失敗しました');
       }
 
       toast.success('暗記帳を削除しました');
       router.refresh();
     } catch (error) {
-      toast.error('暗記帳の削除に失敗しました');
+      const errorMessage =
+        error instanceof Error ? error.message : '暗記帳の削除に失敗しました';
+      toast.error(errorMessage);
     }
   };
 

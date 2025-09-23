@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, withPrisma } from '@/src/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { container } from '@/src/infrastructure/container/di-container';
+import { z } from 'zod';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,50 +11,70 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
-    const groups = await withPrisma(async (prisma) => {
-      return await prisma.group.findMany({
-        where: {
-          userId: session.user.id,
-        },
-      });
+    const getUserGroupsUseCase = container.getGetUserGroupsUseCase();
+    const result = await getUserGroupsUseCase.execute({
+      userId: session.user.id,
     });
-    return NextResponse.json(groups);
-  } catch (e) {
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+
+    return NextResponse.json(result.groups);
+  } catch (error) {
+    console.error('Error fetching groups:', error);
     return NextResponse.json(
-      { error: 'DB取得エラー', detail: String(e) },
+      {
+        error: 'グループの取得に失敗しました',
+        details:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
+      },
       { status: 500 },
     );
   }
 }
 
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-  }
+const createGroupSchema = z.object({
+  name: z.string().min(1, 'グループ名は必須です'),
+  description: z.string().optional(),
+  deckIds: z.array(z.string()).optional(),
+});
 
-  const data = await req.json();
-  const { name } = data;
-  if (!name) {
-    return NextResponse.json(
-      { error: 'グループ名は必須です' },
-      { status: 400 },
-    );
-  }
+export async function POST(req: NextRequest) {
   try {
-    const newGroup = await withPrisma(async (prisma) => {
-      return await prisma.group.create({
-        data: {
-          name,
-          userId: session.user.id,
-        },
-      });
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const validatedData = createGroupSchema.parse(body);
+
+    const createGroupUseCase = container.getCreateGroupUseCase();
+    const result = await createGroupUseCase.execute({
+      userId: session.user.id,
+      name: validatedData.name,
+      description: validatedData.description,
+      deckIds: validatedData.deckIds,
     });
-    return NextResponse.json(newGroup);
-  } catch (e) {
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: result.group,
+    });
+  } catch (error) {
+    console.error('Error creating group:', error);
     return NextResponse.json(
-      { error: 'DB保存エラー', detail: String(e) },
-      { status: 500 },
+      {
+        error: 'グループの作成に失敗しました',
+        details:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
+      },
+      { status: 400 },
     );
   }
 }
@@ -74,38 +95,28 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // グループの所有者を確認
-    const group = await withPrisma(async (prisma) => {
-      return await prisma.group.findUnique({
-        where: { id: groupId },
-      });
+    const deleteGroupUseCase = container.getDeleteGroupUseCase();
+    const result = await deleteGroupUseCase.execute({
+      groupId,
+      userId: session.user.id,
     });
 
-    if (!group) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'グループが見つかりません' },
-        { status: 404 },
+        { error: result.error },
+        { status: result.error === 'グループが見つかりません' ? 404 : 403 },
       );
     }
-
-    if (group.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'このグループを削除する権限がありません' },
-        { status: 403 },
-      );
-    }
-
-    // グループを削除
-    await withPrisma(async (prisma) => {
-      await prisma.group.delete({
-        where: { id: groupId },
-      });
-    });
 
     return NextResponse.json({ success: true });
-  } catch (e) {
+  } catch (error) {
+    console.error('Error deleting group:', error);
     return NextResponse.json(
-      { error: 'DB削除エラー', detail: String(e) },
+      {
+        error: 'グループの削除に失敗しました',
+        details:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
+      },
       { status: 500 },
     );
   }

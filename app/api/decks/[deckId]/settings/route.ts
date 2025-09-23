@@ -1,87 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { prisma } from '@/src/lib/prisma';
-import { FilterMode, Prisma } from '@prisma/client';
+import { container } from '@/src/infrastructure/container/di-container';
+import { z } from 'zod';
 
-type Body = {
-  autoSpeak?: boolean;
-  reverse?: boolean;
-  shuffle?: boolean;
-  /** 文字列が飛んで来るので string[] で受け取り → FilterMode[] に変換 */
-  filterMode?: string[];
-  reset?: boolean;
-};
+const updateDeckSettingSchema = z.object({
+  autoSpeak: z.boolean().optional(),
+  reverse: z.boolean().optional(),
+  shuffle: z.boolean().optional(),
+  filterMode: z.array(z.string()).optional(),
+  reset: z.boolean().optional(),
+});
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: { deckId: string } },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id)
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    }
 
-  const setting = await prisma.deckSetting.findUnique({
-    where: {
-      userId_deckId: { userId: session.user.id, deckId: params.deckId },
-    },
-  });
-  return NextResponse.json({ data: setting });
+    const getDeckSettingUseCase = container.getGetDeckSettingUseCase();
+    const result = await getDeckSettingUseCase.execute({
+      userId: session.user.id,
+      deckId: params.deckId,
+    });
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    return NextResponse.json({ data: result.deckSetting });
+  } catch (error) {
+    console.error('Error fetching deck setting:', error);
+    return NextResponse.json(
+      { error: 'デッキ設定の取得に失敗しました' },
+      { status: 500 },
+    );
+  }
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { deckId: string } },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id)
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    }
 
-  const userId = session.user.id;
-  const deckId = params.deckId;
+    const body = await req.json();
+    const validatedData = updateDeckSettingSchema.parse(body);
 
-  /*──── 本文整形 ────*/
-  const body: Body = await req.json();
+    const updateDeckSettingUseCase = container.getUpdateDeckSettingUseCase();
+    const result = await updateDeckSettingUseCase.execute({
+      userId: session.user.id,
+      deckId: params.deckId,
+      autoSpeak: validatedData.autoSpeak,
+      reverse: validatedData.reverse,
+      shuffle: validatedData.shuffle,
+      filterMode: validatedData.filterMode as any, // Type assertion for compatibility
+    });
 
-  /** reset フラグはここで解釈して削除 */
-  if (body.reset) {
-    // 例: progress を 0 に戻す SQL など
-    delete body.reset;
-  }
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
 
-  /** filterMode―――文字列 → enum 配列へ変換 / 空なら undefined へ */
-  let modes: FilterMode[] | undefined;
-  if (Array.isArray(body.filterMode)) {
-    const allow = new Set(Object.values(FilterMode));
-    const arr = body.filterMode.filter<FilterMode>((v): v is FilterMode =>
-      allow.has(v as FilterMode),
+    return NextResponse.json({ data: result.deckSetting });
+  } catch (error) {
+    console.error('Error updating deck setting:', error);
+    return NextResponse.json(
+      { error: 'デッキ設定の更新に失敗しました' },
+      { status: 500 },
     );
-    if (arr.length) modes = arr;
   }
-
-  /*──── Prisma に渡す型を個別に構築 ────*/
-  const updateData: Prisma.DeckSettingUncheckedUpdateInput = {
-    autoSpeak: body.autoSpeak,
-    reverse: body.reverse,
-    shuffle: body.shuffle,
-    ...(modes ? { filterMode: modes } : {}),
-  };
-
-  const createData: Prisma.DeckSettingUncheckedCreateInput = {
-    userId,
-    deckId,
-    autoSpeak: body.autoSpeak ?? false,
-    reverse: body.reverse ?? false,
-    shuffle: body.shuffle ?? false,
-    filterMode: modes ?? [], // ← create は空配列で OK
-  };
-
-  /*──── upsert ────*/
-  const saved = await prisma.deckSetting.upsert({
-    where: { userId_deckId: { userId, deckId } },
-    update: updateData,
-    create: createData,
-  });
-
-  return NextResponse.json({ data: saved });
 }
