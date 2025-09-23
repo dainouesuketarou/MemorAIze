@@ -1,46 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { container } from '@/src/infrastructure/container/di-container';
+import { z } from 'zod';
 
-const prisma = new PrismaClient();
+const updateStudyResultSchema = z.object({
+  results: z.array(
+    z.object({
+      id: z.string(),
+      mastered: z.boolean(),
+    }),
+  ),
+});
 
-export async function POST(req: NextRequest, { params }: { params: { deckId: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { deckId: string } },
+) {
   try {
-    const data = await req.json();
-    const { results } = data; 
-    if (!Array.isArray(results)) {
-      return NextResponse.json({ error: 'Invalid results' }, { status: 400 });
-    }
-    const updatePromises = results.map((r: { id: string, mastered: boolean }) =>
-      prisma.card.update({
-        where: { id: r.id },
-        data: { 
-          status: r.mastered ? 'MASTERED' : 'STRUGGLING'
-        },
-      })
-    );
-    await Promise.all(updatePromises);
+    const body = await req.json();
+    const validatedData = updateStudyResultSchema.parse(body);
 
-    // Deckのprogressを更新
-    const deck = await prisma.deck.findUnique({
-      where: { id: params.deckId },
-      include: {
-        cards: true,
-      },
+    const updateStudyResultUseCase = container.getUpdateStudyResultUseCase();
+    const result = await updateStudyResultUseCase.execute({
+      deckId: params.deckId,
+      results: validatedData.results,
     });
 
-    if (deck) {
-      const totalCards = deck.cards.length;
-      const masteredCount = deck.cards.filter(card => card.status === 'MASTERED').length;
-      const progress = totalCards > 0 ? masteredCount / totalCards : 0;
-
-      await prisma.deck.update({
-        where: { id: params.deckId },
-        data: { progress },
-      });
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
     return NextResponse.json({ success: true });
-  } catch (e) {
-    return NextResponse.json({ error: 'DB更新エラー', detail: String(e) }, { status: 500 });
+  } catch (error) {
+    console.error('Error updating study result:', error);
+    return NextResponse.json(
+      { error: '学習結果の更新に失敗しました', detail: String(error) },
+      { status: 500 },
+    );
   }
-} 
+}

@@ -28,14 +28,16 @@ export function SyncSessionToRedux({
 
           if (response.ok) {
             const data = await response.json();
-            const todayLogins = data.logins || [];
+
+            // 新しいDTOレスポンス形式に対応
+            const todayLogins = data.success ? data.data || [] : [];
 
             // 今日のログイン記録がない場合のみ記録
             if (todayLogins.length === 0) {
               const now = new Date();
               const jpNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
 
-              await fetch('/api/auth/login-history', {
+              const createResponse = await fetch('/api/auth/login-history', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -44,7 +46,21 @@ export function SyncSessionToRedux({
                   loginAt: jpNow.toISOString(),
                 }),
               });
+
+              if (!createResponse.ok) {
+                const errorData = await createResponse.json();
+                console.error(
+                  'ログイン履歴作成エラー:',
+                  errorData.error || 'Unknown error',
+                );
+              }
             }
+          } else {
+            const errorData = await response.json();
+            console.error(
+              'ログイン履歴取得エラー:',
+              errorData.error || 'Unknown error',
+            );
           }
         } catch (error) {
           console.error('ログイン履歴の記録に失敗:', error);

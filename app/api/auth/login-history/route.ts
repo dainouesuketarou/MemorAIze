@@ -1,94 +1,150 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { getAuthSession } from '@/src/lib/auth';
-import { prisma } from '@/src/lib/prisma';
-import { parseISO } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { container } from '@/src/infrastructure/container/di-container';
+import {
+  CreateLoginHistoryRequestSchema,
+  CreateLoginHistoryResponse,
+  GetLoginHistoryQuerySchema,
+  GetLoginHistoryResponse,
+  SuccessResponse,
+  ErrorResponse,
+} from '@/src/dto';
 
 // ログイン履歴を記録
-export async function POST(req: Request) {
+export async function POST(
+  req: Request,
+): Promise<NextResponse<CreateLoginHistoryResponse>> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-    });
-
-    if (!user) {
       return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 },
+        {
+          success: false,
+          error: '認証が必要です',
+        } as CreateLoginHistoryResponse,
+        { status: 401 },
       );
     }
 
-    // リクエストボディから日時を取得（指定がない場合は現在時刻）
     const body = await req.json();
-    const loginAt = body.loginAt ? new Date(body.loginAt) : new Date();
+    const validatedData = CreateLoginHistoryRequestSchema.parse(body);
 
-    // 日本時間でログイン時刻を記録
-    const loginHistory = await prisma.loginHistory.create({
-      data: {
-        userId: user.id,
-        loginAt: toZonedTime(loginAt, 'Asia/Tokyo'),
-      },
+    const createLoginHistoryUseCase = container.getCreateLoginHistoryUseCase();
+    const result = await createLoginHistoryUseCase.execute({
+      userId: session.user.id,
+      loginAt: validatedData.loginAt
+        ? new Date(validatedData.loginAt)
+        : new Date(),
     });
 
-    return NextResponse.json(loginHistory);
-  } catch (error) {
-    console.error('ログイン履歴の記録に失敗しました:', error);
-    return NextResponse.json(
-      {
-        error: 'ログイン履歴の記録に失敗しました',
-        detail: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    );
-  }
-}
-
-// 特定の期間のログイン履歴を取得
-export async function GET(req: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const start = searchParams.get('start');
-    const end = searchParams.get('end');
-
-    if (!start || !end) {
+    if (!result.success || !result.loginHistory) {
       return NextResponse.json(
-        { error: '開始日と終了日が必要です' },
+        {
+          success: false,
+          error: result.error || 'ログイン履歴の作成に失敗しました',
+        } as CreateLoginHistoryResponse,
         { status: 400 },
       );
     }
 
-    const where = {
-      userId: session.user.id,
-      loginAt: {
-        gte: toZonedTime(new Date(start), 'Asia/Tokyo'),
-        lte: toZonedTime(new Date(end), 'Asia/Tokyo'),
+    const response: SuccessResponse<{
+      id: string;
+      userId: string;
+      loginAt: string;
+      createdAt: string;
+    }> = {
+      success: true,
+      data: {
+        id: result.loginHistory.id,
+        userId: result.loginHistory.userId,
+        loginAt: result.loginHistory.loginAt.toISOString(),
+        createdAt: result.loginHistory.createdAt.toISOString(),
       },
     };
 
-    const loginHistory = await prisma.loginHistory.findMany({
-      where,
-      orderBy: { loginAt: 'desc' },
+    return NextResponse.json(response);
+  } catch (error) {
+    console.error('ログイン履歴の記録に失敗しました:', error);
+    const errorResponse: ErrorResponse = {
+      success: false,
+      error: 'ログイン履歴の記録に失敗しました',
+      details: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    };
+    return NextResponse.json(errorResponse, { status: 500 });
+  }
+}
+
+// 特定の期間のログイン履歴を取得
+export async function GET(
+  req: Request,
+): Promise<NextResponse<GetLoginHistoryResponse>> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '認証が必要です',
+        } as GetLoginHistoryResponse,
+        { status: 401 },
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const queryParams = Object.fromEntries(searchParams.entries());
+    const validatedQuery = GetLoginHistoryQuerySchema.parse(queryParams);
+
+    const getUserLoginHistoryUseCase =
+      container.getGetUserLoginHistoryUseCase();
+    const result = await getUserLoginHistoryUseCase.execute({
+      userId: session.user.id,
+      startDate: validatedQuery.startDate
+        ? new Date(validatedQuery.startDate)
+        : undefined,
+      endDate: validatedQuery.endDate
+        ? new Date(validatedQuery.endDate)
+        : undefined,
+      limit: validatedQuery.limit,
     });
 
-    return NextResponse.json(loginHistory);
+    if (!result.success || !result.loginHistories) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: result.error || 'ログイン履歴の取得に失敗しました',
+        } as GetLoginHistoryResponse,
+        { status: 400 },
+      );
+    }
+
+    const response: SuccessResponse<
+      Array<{
+        id: string;
+        userId: string;
+        loginAt: string;
+        createdAt: string;
+      }>
+    > = {
+      success: true,
+      data: result.loginHistories.map((history) => ({
+        id: history.id,
+        userId: history.userId,
+        loginAt: history.loginAt.toISOString(),
+        createdAt: history.createdAt.toISOString(),
+      })),
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('ログイン履歴の取得に失敗しました:', error);
-    return NextResponse.json(
-      { error: 'ログイン履歴の取得に失敗しました', detail: String(error) },
-      { status: 500 },
-    );
+    const errorResponse: ErrorResponse = {
+      success: false,
+      error: 'ログイン履歴の取得に失敗しました',
+      details: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }

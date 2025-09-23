@@ -44,7 +44,10 @@ export function CardAddManualForm({ deckId, onSuccess }: Props) {
         throw new Error(errorData.error || 'カードの追加に失敗しました');
       }
 
-      const data = await res.json();
+      const responseData = await res.json();
+
+      // 新しいDTOレスポンス形式に対応
+      const data = responseData.success ? responseData.data : responseData;
 
       // Reduxの状態を更新
       dispatch(

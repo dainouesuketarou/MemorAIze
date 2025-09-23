@@ -36,13 +36,16 @@ export function CardEditForm({
       });
 
       if (!response.ok) {
-        throw new Error('カードの更新に失敗しました');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'カードの更新に失敗しました');
       }
 
       toast.success('カードを更新しました');
       onSuccess();
     } catch (error) {
-      toast.error('エラーが発生しました');
+      const errorMessage =
+        error instanceof Error ? error.message : 'エラーが発生しました';
+      toast.error(errorMessage);
       console.error(error);
     } finally {
       setIsLoading(false);

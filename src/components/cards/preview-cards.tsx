@@ -132,16 +132,19 @@ export function PreviewCards({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'カードの改善に失敗しました');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'カードの改善に失敗しました');
       }
 
-      const data = await response.json();
-      if (!data.success || !data.data?.cards?.length) {
+      const responseData = await response.json();
+      // 新しいDTOレスポンス形式に対応
+      const data = responseData.success ? responseData.data : responseData;
+
+      if (!data?.cards?.length) {
         throw new Error('カードの改善に失敗しました');
       }
 
-      commit(data.data.cards);
+      commit(data.cards);
       toast({
         title: 'カードを改善しました',
         description: 'AIによってカードの内容が改善されました。',

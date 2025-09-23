@@ -23,12 +23,11 @@ import { AiLimitBadge } from '@/src/components/dashboard/ai-limit-badge';
 import { Loading } from '../loading';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/src/lib/store/store';
+import { setGroupMode } from '@/src/lib/store/slices/groupModeSlice';
 
 interface DashboardShellProps {
   children: React.ReactNode;
   fullWidth?: boolean;
-  groupMode: boolean;
-  setGroupMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 interface AiGenerationLimit {
@@ -56,8 +55,6 @@ const getRelativeTime = (date: Date | string) => {
 export function DashboardShell({
   children,
   fullWidth = false,
-  groupMode,
-  setGroupMode,
 }: DashboardShellProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [scrolled, setScrolled] = useState(false);
@@ -72,6 +69,7 @@ export function DashboardShell({
   const { decks, isLoading: decksLoading } = useSelector(
     (state: RootState) => state.deck,
   );
+  const { groupMode } = useSelector((state: RootState) => state.groupMode);
   const { isLoading: groupsLoading } = useSelector(
     (state: RootState) => state.group,
   );
@@ -101,8 +99,9 @@ export function DashboardShell({
   const filteredDecks = useMemo(() => {
     if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
-    return decks.filter((deck: DeckWithCardsAndGroups) =>
-      deck.title.toLowerCase().includes(query),
+    return decks.filter(
+      (deck: DeckWithCardsAndGroups) =>
+        deck.title && deck.title.toLowerCase().includes(query),
     );
   }, [decks, searchQuery]);
 
@@ -202,7 +201,16 @@ export function DashboardShell({
         )}
       >
         <div className="max-w-7xl mx-auto flex h-16 items-center justify-between py-4 px-4 sm:px-6 lg:px-8 w-full">
-          <MainNav groupMode={groupMode} setGroupMode={setGroupMode} />
+          <MainNav
+            groupMode={groupMode}
+            setGroupMode={(value) =>
+              dispatch(
+                setGroupMode(
+                  typeof value === 'function' ? value(groupMode) : value,
+                ),
+              )
+            }
+          />
 
           <div className="flex-1 justify-center px-4 lg:px-8">
             {isDashboardPage && (

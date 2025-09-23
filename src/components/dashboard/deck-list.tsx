@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Deck, Group } from '@prisma/client';
+import { useState, useEffect, useMemo } from 'react';
+// import { Deck, Group } from '@prisma/client'; // DTOベースの型を使用するため削除
 import {
   Card,
   CardContent,
@@ -44,23 +44,57 @@ import {
   setError,
 } from '@/src/lib/store/slices/deckSlice';
 import { AnyAction } from '@reduxjs/toolkit';
-import { DeckWithCardsAndGroups } from '@/src/types/deck';
+import { DeckWithCardsAndGroups, GroupWithDetails } from '@/src/types/deck';
+import { transformDecksData } from '@/src/lib/utils/data-transform';
 
 interface DeckListProps {
-  decks: DeckWithCardsAndGroups[];
-  groupMode: boolean;
-  groups: Group[];
-  setDecks: (decks: DeckWithCardsAndGroups[]) => void;
+  selectedGroup: string;
 }
 
-export function DeckList({
-  decks,
-  groupMode,
-  groups,
-  setDecks,
-}: DeckListProps) {
+export function DeckList({ selectedGroup }: DeckListProps) {
   const dispatch = useDispatch();
-  const { isLoading } = useSelector((state: RootState) => state.deck);
+  const { isLoading, decks, filter, sort } = useSelector(
+    (state: RootState) => state.deck,
+  );
+  const { groupMode } = useSelector((state: RootState) => state.groupMode);
+  const { groups } = useSelector((state: RootState) => state.group);
+
+  // フィルタリングとソートの適用
+  const filteredAndSortedDecks = useMemo(() => {
+    const filtered =
+      selectedGroup === 'all'
+        ? decks
+        : decks.filter((d) => d.groups?.some((g) => g.id === selectedGroup));
+
+    return [...filtered]
+      .filter((deck) => {
+        if (filter === 'all') return true;
+        const progress = deck.progress || 0;
+        if (filter === 'inProgress') return progress > 0 && progress < 1;
+        if (filter === 'completed') return progress === 1;
+        if (filter === 'notStarted') return progress === 0;
+        return true;
+      })
+      .sort((a, b) => {
+        if (sort === 'recent') {
+          const bTime = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
+          const aTime = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
+          return bTime - aTime;
+        }
+        if (sort === 'alphabetical') {
+          const aTitle = a.title || '';
+          const bTitle = b.title || '';
+          return aTitle.localeCompare(bTitle);
+        }
+        if (sort === 'cardCount') {
+          const aCardCount = a.cardCount || 0;
+          const bCardCount = b.cardCount || 0;
+          return bCardCount - aCardCount;
+        }
+        return 0;
+      });
+  }, [decks, selectedGroup, filter, sort]);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDeck, setSelectedDeck] =
     useState<DeckWithCardsAndGroups | null>(null);
@@ -73,7 +107,9 @@ export function DeckList({
   // モーダルを開く時に選択状態を初期化
   useEffect(() => {
     if (selectedDeck) {
-      setSelectedGroups(selectedDeck.groups.map((g) => g.id));
+      setSelectedGroups(
+        selectedDeck.groups?.filter((g) => g && g.id).map((g) => g.id) || [],
+      );
     }
   }, [selectedDeck]);
 
@@ -100,7 +136,7 @@ export function DeckList({
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || 'グループ更新に失敗しました');
+        throw new Error(error.error || 'グループ更新に失敗しました');
       }
 
       // PATCH成功後に最新データを再取得
@@ -109,9 +145,11 @@ export function DeckList({
         throw new Error('デッキ一覧の取得に失敗しました');
       }
 
-      const updatedDecks = await decksRes.json();
-      dispatch(setDecks(updatedDecks) as unknown as AnyAction);
-      setDecks(updatedDecks);
+      const decksData = await decksRes.json();
+      // 新しいDTOレスポンス形式に対応
+      const rawDecks = decksData.success ? decksData.data : decksData;
+      const transformedDecks = transformDecksData(rawDecks);
+      dispatch(setDecks(transformedDecks) as unknown as AnyAction);
       toast.success('グループを更新しました');
       setModalOpen(false);
     } catch (error) {
@@ -141,14 +179,13 @@ export function DeckList({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete deck');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'デッキの削除に失敗しました');
       }
 
       // 削除成功後、デッキリストを更新
       const updatedDecks = decks.filter((deck) => deck.id !== deckToDelete.id);
       dispatch(setDecks(updatedDecks) as unknown as AnyAction);
-      setDecks(updatedDecks);
-
       toast.success('暗記帳を削除しました');
       setDeleteModalOpen(false);
       setDeckToDelete(null);
@@ -184,166 +221,179 @@ export function DeckList({
   return (
     <>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {decks.map((deck) => (
-          <Card
-            key={deck.id}
-            className={cn(
-              'hover:shadow-md transition-shadow',
-              groupMode ? 'cursor-pointer' : '',
-            )}
-            onClick={() => {
-              if (groupMode) {
-                setSelectedDeck(deck);
-                setModalOpen(true);
-              }
-            }}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{deck.title}</CardTitle>
-                  <CardDescription className="line-clamp-2 mt-1">
-                    {deck.description}
-                  </CardDescription>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="h-6 w-6 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDeck(deck);
-                        setModalOpen(true);
-                      }}
-                    >
-                      グループ化
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeckToDelete(deck);
-                        setDeleteModalOpen(true);
-                      }}
-                      className="text-red-600"
-                    >
-                      削除
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-                <Book className="h-4 w-4" />
-                <span>{deck.cardCount}枚のカード</span>
-                {deck.lastStudied && (
-                  <>
-                    <Clock className="h-4 w-4 ml-2" />
-                    <span>
-                      最終学習日: {formatRelativeTime(deck.lastStudied)}
-                    </span>
-                  </>
-                )}
-              </div>
-              {/* 学習進捗バーと割合表示 */}
-              {deck.cards ? (
-                (() => {
-                  const totalCards = deck.cardCount;
-                  const masteredCount = deck.cards.filter(
-                    (card: { status: string }) => card.status === 'MASTERED',
-                  ).length;
-                  const strugglingCount = deck.cards.filter(
-                    (card: { status: string }) => card.status === 'STRUGGLING',
-                  ).length;
-                  const unlearnedCount = deck.cards.filter(
-                    (card: { status: string }) => card.status === 'UNLEARNED',
-                  ).length;
-                  const masteredPercentage =
-                    totalCards > 0
-                      ? Math.round((masteredCount / totalCards) * 100)
-                      : 0;
-                  const strugglingPercentage =
-                    totalCards > 0
-                      ? Math.round((strugglingCount / totalCards) * 100)
-                      : 0;
-                  const unlearnedPercentage =
-                    totalCards > 0
-                      ? Math.round((unlearnedCount / totalCards) * 100)
-                      : 0;
-                  return (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>学習進捗</span>
-                        <span>{masteredPercentage}%</span>
-                      </div>
-                      <div className="w-full h-4 bg-gray-200 rounded-full flex overflow-hidden">
-                        <div
-                          style={{ width: `${masteredPercentage}%` }}
-                          className="bg-[#4ade80] h-4"
-                        />
-                        <div
-                          style={{ width: `${strugglingPercentage}%` }}
-                          className="bg-[#f87171] h-4"
-                        />
-                        <div
-                          style={{ width: `${unlearnedPercentage}%` }}
-                          className="bg-[#9ca3af] h-4"
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs mt-1">
-                        <span className="text-[#4ade80]">
-                          覚えた {masteredPercentage}%
-                        </span>
-                        <span className="text-[#f87171]">
-                          苦手 {strugglingPercentage}%
-                        </span>
-                        <span className="text-[#9ca3af]">
-                          未学習 {unlearnedPercentage}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>学習進捗</span>
-                    <span>0%</span>
-                  </div>
-                  <div className="w-full h-4 bg-gray-200 rounded-full" />
-                  <div className="flex justify-between text-xs mt-1">
-                    <span className="text-[#4ade80]">覚えた 0%</span>
-                    <span className="text-[#f87171]">苦手 0%</span>
-                    <span className="text-[#9ca3af]">未学習 0%</span>
-                  </div>
-                </div>
+        {filteredAndSortedDecks
+          ?.filter((deck) => deck && deck.id)
+          .map((deck) => (
+            <Card
+              key={deck.id}
+              className={cn(
+                'hover:shadow-md transition-shadow',
+                groupMode ? 'cursor-pointer' : '',
               )}
-              <div className="flex flex-wrap gap-2 mt-4">
-                {deck.groups.map((group) => (
-                  <Badge key={group.id} variant="secondary">
-                    {group.name}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Link href={`/deck/${deck.id}`} className="w-full">
-                <Button className="w-full">
-                  <Play className="mr-2 h-4 w-4" />
-                  学習に進む
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
-        ))}
+              onClick={() => {
+                if (groupMode) {
+                  setSelectedDeck(deck);
+                  setModalOpen(true);
+                }
+              }}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">
+                      {deck.title || 'タイトルなし'}
+                    </CardTitle>
+                    <CardDescription className="line-clamp-2 mt-1">
+                      {deck.description || '説明なし'}
+                    </CardDescription>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-6 w-6 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDeck(deck);
+                          setModalOpen(true);
+                        }}
+                      >
+                        グループ化
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeckToDelete(deck);
+                          setDeleteModalOpen(true);
+                        }}
+                        className="text-red-600"
+                      >
+                        削除
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                  <Book className="h-4 w-4" />
+                  <span>{deck.cardCount || 0}枚のカード</span>
+                  {deck.lastStudied && (
+                    <>
+                      <Clock className="h-4 w-4 ml-2" />
+                      <span>
+                        最終学習日: {formatRelativeTime(deck.lastStudied)}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {/* 学習進捗バーと割合表示 */}
+                {deck.cards ? (
+                  <div className="space-y-2">
+                    {(() => {
+                      const totalCards = deck.cardCount || 0;
+                      const cards = deck.cards || [];
+                      const masteredCount = cards.filter(
+                        (card: { status: string }) =>
+                          card.status === 'MASTERED',
+                      ).length;
+                      const strugglingCount = cards.filter(
+                        (card: { status: string }) =>
+                          card.status === 'STRUGGLING',
+                      ).length;
+                      const unlearnedCount = cards.filter(
+                        (card: { status: string }) =>
+                          card.status === 'UNLEARNED',
+                      ).length;
+                      const masteredPercentage =
+                        totalCards > 0
+                          ? Math.round((masteredCount / totalCards) * 100)
+                          : 0;
+                      const strugglingPercentage =
+                        totalCards > 0
+                          ? Math.round((strugglingCount / totalCards) * 100)
+                          : 0;
+                      const unlearnedPercentage =
+                        totalCards > 0
+                          ? Math.round((unlearnedCount / totalCards) * 100)
+                          : 0;
+
+                      return (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span>学習進捗</span>
+                            <span>{masteredPercentage}%</span>
+                          </div>
+                          <div className="w-full h-4 bg-gray-200 rounded-full flex overflow-hidden">
+                            <div
+                              style={{ width: `${masteredPercentage}%` }}
+                              className="bg-[#4ade80] h-4"
+                            />
+                            <div
+                              style={{ width: `${strugglingPercentage}%` }}
+                              className="bg-[#f87171] h-4"
+                            />
+                            <div
+                              style={{ width: `${unlearnedPercentage}%` }}
+                              className="bg-[#9ca3af] h-4"
+                            />
+                          </div>
+                          <div className="flex justify-between text-xs mt-1">
+                            <span className="text-[#4ade80]">
+                              覚えた {masteredPercentage}%
+                            </span>
+                            <span className="text-[#f87171]">
+                              苦手 {strugglingPercentage}%
+                            </span>
+                            <span className="text-[#9ca3af]">
+                              未学習 {unlearnedPercentage}%
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>学習進捗</span>
+                      <span>0%</span>
+                    </div>
+                    <div className="w-full h-4 bg-gray-200 rounded-full" />
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className="text-[#4ade80]">覚えた 0%</span>
+                      <span className="text-[#f87171]">苦手 0%</span>
+                      <span className="text-[#9ca3af]">未学習 0%</span>
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {deck.groups
+                    ?.filter((group) => group && group.id)
+                    .map((group) => (
+                      <Badge key={group.id} variant="secondary">
+                        {group.name}
+                      </Badge>
+                    )) || []}
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Link href={`/deck/${deck.id}`} className="w-full">
+                  <Button className="w-full">
+                    <Play className="mr-2 h-4 w-4" />
+                    学習に進む
+                  </Button>
+                </Link>
+              </CardFooter>
+            </Card>
+          ))}
       </div>
 
       {/* グループ化モーダル */}
@@ -356,39 +406,41 @@ export function DeckList({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {groups.map((group) => (
-              <div
-                key={group.id}
-                className={cn(
-                  'flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer',
-                  selectedGroups.includes(group.id)
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50',
-                )}
-                onClick={() => handleGroupToggle(group.id)}
-              >
-                <div className="flex items-center space-x-3">
-                  <div
-                    className={cn(
-                      'h-4 w-4 rounded-full border-2 flex items-center justify-center',
-                      selectedGroups.includes(group.id)
-                        ? 'border-primary bg-primary'
-                        : 'border-border',
-                    )}
-                  >
-                    {selectedGroups.includes(group.id) && (
-                      <div className="h-2 w-2 rounded-full bg-background" />
-                    )}
+            {groups
+              ?.filter((group) => group && group.id)
+              .map((group) => (
+                <div
+                  key={group.id}
+                  className={cn(
+                    'flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer',
+                    selectedGroups.includes(group.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50',
+                  )}
+                  onClick={() => handleGroupToggle(group.id)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className={cn(
+                        'h-4 w-4 rounded-full border-2 flex items-center justify-center',
+                        selectedGroups.includes(group.id)
+                          ? 'border-primary bg-primary'
+                          : 'border-border',
+                      )}
+                    >
+                      {selectedGroups.includes(group.id) && (
+                        <div className="h-2 w-2 rounded-full bg-background" />
+                      )}
+                    </div>
+                    <span className="font-medium">{group.name}</span>
                   </div>
-                  <span className="font-medium">{group.name}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedDeck?.groups?.some((g) => g.id === group.id)
+                      ? '現在のグループ'
+                      : ''}
+                  </span>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {selectedDeck?.groups.some((g) => g.id === group.id)
-                    ? '現在のグループ'
-                    : ''}
-                </span>
-              </div>
-            ))}
+              ))}
           </div>
           <DialogFooter className="flex justify-between sm:justify-between">
             <DialogClose asChild>

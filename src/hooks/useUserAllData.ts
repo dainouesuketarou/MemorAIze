@@ -6,6 +6,10 @@ import { setGroups } from '@/src/lib/store/slices/groupSlice';
 import { setDecks } from '@/src/lib/store/slices/deckSlice';
 import { setLimit } from '@/src/lib/store/slices/aiGenerationLimitSlice';
 import { useSession } from 'next-auth/react';
+import {
+  transformDecksData,
+  transformGroupsData,
+} from '@/src/lib/utils/data-transform';
 
 /**
  * ユーザーがログインした時にUser, Subscription, AiGenerationLimit, Deck, Group情報を一括取得し、Reduxに保存するカスタムフック
@@ -127,8 +131,22 @@ export const useUserAllData = () => {
         // Reduxに保存（nullの場合はスキップ）
         if (subscription) dispatch(setSubscription(subscription));
         if (aiLimitData?.limit) dispatch(setLimit(aiLimitData.limit));
-        if (decksData) dispatch(setDecks(decksData));
-        if (groupsData) dispatch(setGroups(groupsData));
+
+        // 新しいDTOレスポンス形式に対応
+        if (decksData) {
+          const rawDecks = decksData.success ? decksData.data : decksData;
+          console.log('🔍 変換前のdecks:', rawDecks);
+          const transformedDecks = transformDecksData(rawDecks);
+          console.log('🔍 変換後のdecks:', transformedDecks);
+          dispatch(setDecks(transformedDecks));
+        }
+        if (groupsData) {
+          const rawGroups = groupsData.success ? groupsData.data : groupsData;
+          console.log('🔍 変換前のgroups:', rawGroups);
+          const transformedGroups = transformGroupsData(rawGroups);
+          console.log('🔍 変換後のgroups:', transformedGroups);
+          dispatch(setGroups(transformedGroups));
+        }
 
         console.log('ユーザーデータ一括取得完了');
         setInitialized(true);
@@ -168,6 +186,7 @@ export const useUserAllData = () => {
 
   // ローディング中または認証中
   if (status === 'loading' || loading) {
+    console.log('🔄 useUserAllData - ローディング中:', { loading, status });
     return {
       user: userState,
       subscription: userState.subscription,
@@ -177,6 +196,13 @@ export const useUserAllData = () => {
       loading: true,
     };
   }
+
+  console.log('✅ useUserAllData - データ返却:', {
+    user: userState,
+    groups: groups || [],
+    decks: decks || [],
+    loading: loading || userState.isLoading,
+  });
 
   return {
     user: userState,
